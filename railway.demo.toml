@@ -1,0 +1,27 @@
+# Railway config for the PUBLIC DEMO service only. Point a service at this with
+# `railwayConfigFile = railway.demo.toml`; production keeps using `railway.toml`.
+#
+# This file exists because of a trap worth naming: `railway.toml`'s [deploy] startCommand OVERRIDES
+# the start command set on the service, silently. Setting it in the dashboard looked like it worked,
+# the deploy went green-ish, and the seeder simply never ran — the container came up with no tenant
+# on disk and 503'd its own healthcheck. Config-as-code wins, so the config has to be per-service.
+#
+# The alternative — teaching the server to seed itself at boot when a demo flag is set — is
+# deliberately NOT taken. `bean/paths.py` forbids a shipped default notebook sitting beside a live
+# customer precisely because a brain that materialises itself is one save away from overwriting a
+# real one. Seeding stays somebody's explicit act; here that act is this start command.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Seed first, then serve. The seeder is idempotent (it no-ops when the tenant already has its
+# fixtures) and refuses outright to write into a folder holding a corrections log, so a restart is
+# safe and pointing this at a real tenant by mistake fails loudly rather than overwriting anything.
+startCommand = "python scripts/seed_demo_tenant.py && python -m bean.server"
+restartPolicyType = "on_failure"
+
+# The demo has no volume: /data is the container's own filesystem, so every restart is a clean
+# slate. That is the correct shape here rather than a limitation — writes are locked
+# (BEAN_DEMO_READONLY=1), nothing a visitor does is meant to survive, and no persistence means no
+# way for one visitor's session to reach another's.

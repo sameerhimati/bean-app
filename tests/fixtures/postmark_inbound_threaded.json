@@ -1,0 +1,43 @@
+{
+  "FromName": "harriet vance",
+  "MessageStream": "inbound",
+  "From": "harriet.vance@example.com",
+  "FromFull": {
+    "Email": "harriet.vance@example.com",
+    "Name": "harriet vance",
+    "MailboxHash": ""
+  },
+  "To": "\"Sable & Wren Support\" <hello+sablewren@inbound.postmarkapp.com>",
+  "ToFull": [
+    {
+      "Email": "hello+sablewren@inbound.postmarkapp.com",
+      "Name": "Sable & Wren Support",
+      "MailboxHash": "sablewren"
+    }
+  ],
+  "Cc": "",
+  "CcFull": [],
+  "Bcc": "",
+  "BccFull": [],
+  "OriginalRecipient": "hello@sableandwren.example",
+  "Subject": "you forget something?",
+  "MessageID": "a1b2c3d4-5566-7788-99aa-bbccddeeff00",
+  "ReplyTo": "",
+  "MailboxHash": "sablewren",
+  "Date": "Sun, 5 Jul 2026 21:05:00 -0400",
+  "TextBody": "Hi, there!\n\nI just came back from a trip and the drawer runner on one side of my nightstand has come right out of its track... I was thinking of replacing it with the new version but see it's about twice what I paid for the last one! Is there a way I can repair the one I have?\n\nOn Sun, Jul 5, 2026 at 7:39 PM Nora at Sable & Wren <nora@sableandwren.example> wrote:\n> Hi Harriet, just checking in on your recent Sable & Wren order — did you forget something in your cart? Let us know if you have any questions about our Harlow sofas!",
+  "HtmlBody": "<html><body><p>Hi, there!</p><p>I just came back from a trip and the drawer runner on one side of my nightstand has come right out of its track... I was thinking of replacing it with the new version but see it's about twice what I paid for the last one! Is there a way I can repair the one I have?</p></body></html>",
+  "StrippedTextReply": "",
+  "Tag": "",
+  "Headers": [
+    {
+      "Name": "Return-Path",
+      "Value": "<harriet.vance@example.com>"
+    },
+    {
+      "Name": "X-Spam-Status",
+      "Value": "No"
+    }
+  ],
+  "Attachments": []
+}

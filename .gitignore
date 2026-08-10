@@ -1,0 +1,77 @@
+# env / secrets
+.env
+*.key
+*.pem
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# local mail fixtures (don't commit real customer email)
+#
+# The blanket rule is right: a captured Postmark payload is somebody's actual mail. But it also
+# hid the four fixtures the inbound tests read, so `pytest` errored on any fresh clone — and,
+# worse, made the leak invisible. The captures sitting here carried the live store's name, its
+# inbound address, two real customers' email addresses and a phone number, and none of it was
+# reachable by the identity gate, because the gate only reads TRACKED files.
+#
+# So the inbound fixtures are now AUTHORED, not captured — invented Sable & Wren mail, tracked, and
+# checked by tests/test_config_snapshot.py. Anything else dropped in this directory stays ignored.
+# (`**/fixtures/*`, not `fixtures/`: git never descends into an EXCLUDED DIRECTORY, so a `!` rule
+# for a file inside one is unreachable and silently does nothing. Ignore the contents instead.)
+**/fixtures/*
+!tests/fixtures/postmark_inbound_*.json
+*.eml
+*.mbox
+
+# the live operator's real config; commit bean-config.example.json instead
+bean-config.json
+
+# The real identifiers tests/test_config_snapshot.py forbids. Kept OFF the tree for the same reason
+# it forbids them: a public repo carrying the tidy list of names the scrub removed is the scrub
+# undone. Absent → the identity assertions skip loudly. Restore it after a fresh clone.
+tests/identity_denylist.json
+
+# Private working notes: prod hostname, ssh alias, Railway services, the tenant key. It used to be
+# tracked and "deleted at the public cut", i.e. the flip depended on someone remembering one `rm`.
+# Untracked instead, so the documented cut (built from `git ls-files`) cannot carry it.
+session-handoff.md
+
+# per-customer mutable state on the data volume (config + correction log) — never commit
+data/
+
+# Screenshots. These are the highest-risk untracked files in the repo and were NOT ignored: a
+# `git add .` would have committed them. A review-queue screenshot renders the real store name, the
+# operator's name, their authored judgment rules and at least one customer's first name — i.e. every
+# category the identity grep looks for, in a format no grep can ever see. Images are opaque to the
+# pre-publish gate, so they have to be excluded by path, not caught by review.
+*.png
+!web/favicon.png
+!web/apple-touch-icon.png
+!web/og-bean.png
+
+# os
+.DS_Store
+
+# runtime artifacts (regenerable)
+demo_results.json
+web/bean-data.jsx
+
+# node: dev-only (jsdom, so the browser-code tests can run). Nothing ships.
+# It lives in tests/js/, NOT the repo root: a root package.json makes Railway's nixpacks builder
+# detect a Node project and build an image with NO PYTHON. That took prod down once. Never again.
+# tests/js/package-lock.json IS committed — a dev dep is only reproducible if pinned.
+node_modules/
+
+# Playwright MCP scratch (console logs, a11y snapshots). Written into whatever the cwd happens to
+# be, so it lands inside the repo — and a `git add -A` swept two of them into a release commit.
+# Harmless content (public demo only), but junk in a tree whose whole claim is that it is clean.
+.playwright-mcp/
+
+# The raw Playwright capture behind assets/demo.gif and web/demo.mp4. Kept on disk so the GIF can
+# be re-encoded to a size budget without re-driving the browser (scripts/record_demo.mjs
+# --encode-only), but it is ~3MB of regenerable intermediate and does not belong in git.
+.record-tmp/

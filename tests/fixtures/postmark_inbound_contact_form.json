@@ -1,0 +1,43 @@
+{
+  "FromName": "Sable & Wren",
+  "MessageStream": "inbound",
+  "From": "mailer@shopify.com",
+  "FromFull": {
+    "Email": "mailer@shopify.com",
+    "Name": "Sable & Wren (Shopify)",
+    "MailboxHash": ""
+  },
+  "To": "\"Sable & Wren Support\" <hello+sablewren@inbound.postmarkapp.com>",
+  "ToFull": [
+    {
+      "Email": "hello+sablewren@inbound.postmarkapp.com",
+      "Name": "Sable & Wren Support",
+      "MailboxHash": "sablewren"
+    }
+  ],
+  "Cc": "",
+  "CcFull": [],
+  "Bcc": "",
+  "BccFull": [],
+  "OriginalRecipient": "hello@sableandwren.example",
+  "Subject": "New customer message",
+  "MessageID": "c0ffee00-1a2b-4c3d-9e8f-7a6b5c4d3e2f",
+  "ReplyTo": "",
+  "MailboxHash": "sablewren",
+  "Date": "Tue, 7 Jul 2026 13:32:00 -0400",
+  "TextBody": "You received a new message from your online store's contact form.\n\nCountry Code: US\nName: Dana\nEmail: dana.whitlock@example.com\nPhone Number: 555-0142\nMessage: Hi, please call me. I have a question about the dining chairs I purchased. Thank you",
+  "HtmlBody": "<html><body><p>You received a new message from your online store's contact form.</p><p><strong>Country Code:</strong><br>US</p><p><strong>Name:</strong><br>Dana</p><p><strong>Email:</strong><br>dana.whitlock@example.com</p><p><strong>Phone Number:</strong><br>555-0142</p><p><strong>Message:</strong><br>Hi, please call me. I have a question about the dining chairs I purchased. Thank you</p></body></html>",
+  "StrippedTextReply": "",
+  "Tag": "",
+  "Headers": [
+    {
+      "Name": "Return-Path",
+      "Value": "<mailer@shopify.com>"
+    },
+    {
+      "Name": "X-Spam-Status",
+      "Value": "No"
+    }
+  ],
+  "Attachments": []
+}

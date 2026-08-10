@@ -1,0 +1,77 @@
+{
+  "categories": [
+    {
+      "name": "Order Status",
+      "description": "Where-is-my-order (WISMO): tracking, shipping status, has-it-shipped questions for an existing order.",
+      "template": "Hi {name}, thanks for reaching out! I checked on order {order} \u2014 {status_sentence}. {tracking_sentence} Let me know if there's anything else I can help with.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Returns & Exchanges",
+      "description": "Customer wants to return or exchange an item (size swap, changed mind, fit).",
+      "template": "Hi {name}, happy to help with that. {eligibility_sentence} {next_step_sentence} Just reply here and I'll get it moving.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Sizing & Fit",
+      "description": "Pre-purchase or general sizing advice \u2014 what size should I order, does it run large/small.",
+      "template": "Hi {name}, great question! {fit_sentence} {recommendation_sentence} Happy to help if you're between sizes.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Product Question",
+      "description": "Questions about a product itself \u2014 color, material, fit description, availability, details.",
+      "template": "Hi {name}, thanks for asking! {answer_sentence} {caveat_sentence} Let me know if you'd like anything else.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Shipping",
+      "description": "Shipping policy questions \u2014 do you ship to X, how much, how long, methods (not a specific order's status).",
+      "template": "Hi {name}, thanks for checking before you order! {shipping_sentence} Let me know if you have any other questions.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Refunds",
+      "description": "Customer is asking about a refund's status or amount on a return that's already in motion.",
+      "template": "Hi {name}, thanks for your patience. {refund_status_sentence} Reach back out if anything looks off.\n\nWarmly,\nRobin",
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Wholesale",
+      "description": "Bulk / B2B / stockist / net-terms inquiries from a business.",
+      "template": null,
+      "alwaysEscalate": true
+    },
+    {
+      "name": "Escalation",
+      "description": "Angry, repeat-contact, billing dispute, chargeback, legal threat, or anything needing a human now.",
+      "template": null,
+      "alwaysEscalate": true
+    }
+  ],
+  "knowledgeDocs": [
+    {
+      "title": "company-info",
+      "body": "Maple & Moss is a small apparel brand based in Portland, OR, est. 2019. We sell boots, denim, and knitwear. Customer support is run by Robin. We pride ourselves on a warm, personal reply to every customer."
+    },
+    {
+      "title": "product-info",
+      "body": "PRODUCT NOTES.\nBirch overshirt colors: Ecru (warm off-white), Sage (a muted olive green), and Slate (blue-grey). NOTE: on-screen color depends on the customer's display, and we cannot confirm whether a particular lifestyle photo versus the product-page photo is color-accurate for any given screen \u2014 we describe the color in words and offer free returns if it isn't right.\nFenwick boots: full-grain leather, Goodyear welt. Alder jeans: 12oz selvedge denim."
+    },
+    {
+      "title": "return-policy",
+      "body": "RETURNS & EXCHANGES POLICY.\nReturns and exchanges are accepted within 30 days of delivery. Items must be UNWORN, unwashed, and have their original tags attached. Size exchanges are free when the requested size is in stock \u2014 we ship the new size and include a prepaid label for the original.\nWorn, washed, or used items are NOT eligible for a standard return or exchange. The only exceptions are genuine manufacturing defects, which are handled case-by-case at Robin's discretion \u2014 there is no automatic entitlement to a return on a worn item."
+    },
+    {
+      "title": "shipping-policy",
+      "body": "SHIPPING POLICY.\nDomestic (US): standard shipping is free on orders over $75, otherwise $6. Delivery is 3-5 business days after dispatch. We do not offer guaranteed delivery dates and cannot guarantee weekend or next-day arrival \u2014 we have no expedited or Saturday-guaranteed option.\nInternational: we ship to Canada and the United Kingdom. Canada is a $15 flat rate, 6-10 business days; the customer is responsible for any duties or taxes charged at customs. We do not ship anywhere else at this time.\nTracking is emailed automatically when an order dispatches."
+    },
+    {
+      "title": "size-chart",
+      "body": "SIZE & FIT GUIDE.\nBirch wool sweater: runs true to size \u2014 order your usual size. If you are between sizes, size down for a trimmer fit.\nAlder straight-leg jeans: run true to size; numeric waist sizing (26-34).\nFenwick boots: run a half size large \u2014 most people size down a half size."
+    }
+  ],
+  "settings": {
+    "shopifyStore": "maple-and-moss"
+  }
+}

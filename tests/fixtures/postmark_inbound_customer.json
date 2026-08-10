@@ -1,0 +1,43 @@
+{
+  "FromName": "Jordan Ramirez",
+  "MessageStream": "inbound",
+  "From": "jordan.ramirez@example.com",
+  "FromFull": {
+    "Email": "jordan.ramirez@example.com",
+    "Name": "Jordan Ramirez",
+    "MailboxHash": ""
+  },
+  "To": "\"Sable & Wren Support\" <hello+sablewren@inbound.postmarkapp.com>",
+  "ToFull": [
+    {
+      "Email": "hello+sablewren@inbound.postmarkapp.com",
+      "Name": "Sable & Wren Support",
+      "MailboxHash": "sablewren"
+    }
+  ],
+  "Cc": "",
+  "CcFull": [],
+  "Bcc": "",
+  "BccFull": [],
+  "OriginalRecipient": "hello@sableandwren.example",
+  "Subject": "Where is my order??",
+  "MessageID": "9f5a1c30-2b3e-4e1a-9c77-1a2b3c4d5e6f",
+  "ReplyTo": "",
+  "MailboxHash": "sablewren",
+  "Date": "Tue, 7 Jul 2026 10:14:02 -0400",
+  "TextBody": "Hi, I ordered the Aspen extension dining table (order #SW-10482) on July 1st and it still shows as processing. Can you tell me when it will ship? Thanks, Jordan",
+  "HtmlBody": "<html><body><p>Hi, I ordered the Aspen extension dining table (order #SW-10482) on July 1st and it still shows as processing.</p></body></html>",
+  "StrippedTextReply": "",
+  "Tag": "",
+  "Headers": [
+    {
+      "Name": "Return-Path",
+      "Value": "<jordan.ramirez@example.com>"
+    },
+    {
+      "Name": "X-Spam-Status",
+      "Value": "No"
+    }
+  ],
+  "Attachments": []
+}

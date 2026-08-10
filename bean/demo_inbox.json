@@ -1,0 +1,271 @@
+[
+  {
+    "id": "sw-fabric",
+    "sender_name": "Melissa Grant",
+    "sender_email": "melissa.grant@gmail.com",
+    "reply_to": "melissa.grant@gmail.com",
+    "subject": "Which fabric for a house with two dogs?",
+    "body": "Hi! I'm about to order the Harlow 3-seater and I see three fabric grades at checkout. We have two dogs and a four-year-old, and I can't tell which one actually holds up. Which should I pick? Thanks!",
+    "received_at": "Thu, 02 Jul 2026 09:12:00 -0700",
+    "result": {
+      "email_id": "sw-fabric",
+      "bucket": "Product Recommendation",
+      "confidence": "green",
+      "draft": "Thank you for reaching out to Sable & Wren!\n\nGreat question \u2014 and with two dogs and a four-year-old in the mix, the answer is pretty clear: Performance Weave is the one we recommend for your household. It is our stain- and scratch-resistant fabric grade, and it is exactly what we had in mind when we designed it \u2014 pets and small children are the use case it was built for.\n\nA quick word on the other two grades so you have the full picture. Everyday Weave is our standard cotton-linen blend \u2014 lovely, but it will show wear faster in a high-activity home. Full-Grain Leather wipes clean easily and develops a beautiful patina over time, but it is not scratch-proof, so dogs can mark it.\n\nPerformance Weave is available on the Harlow II (our 2026 collection), so that is the version to look at when you are ready to order. If you would like to feel the fabric before committing, we are happy to send swatch cards of all three grades at no charge \u2014 just reply with your mailing address and we will get them out to you.\n\nLet us know if you have any other questions before you order!",
+      "citations": [
+        "notebook:Sofas & Upholstery",
+        "notebook:Store facts"
+      ],
+      "why_unsure": []
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-assembly",
+    "sender_name": "Dale Whitcomb",
+    "sender_email": "dale.whitcomb@yahoo.com",
+    "reply_to": "dale.whitcomb@yahoo.com",
+    "subject": "Bed frame slats don't line up",
+    "body": "I got the Calder bed frame last week (order #SW-20931). I put it together the way the sheet shows, but the slat holes on the side rail don't line up with the bolts at all. Is there a step I'm missing? Happy to send a photo of how it's assembled.",
+    "received_at": "Thu, 02 Jul 2026 10:07:00 -0700",
+    "result": {
+      "email_id": "sw-assembly",
+      "bucket": "Orders, Returns & Refunds",
+      "confidence": "yellow",
+      "draft": "Thank you for reaching out to Sable & Wren!\n\nI am sorry to hear you are experiencing issues with your Calder bed frame. Misaligned slat holes are definitely something we want to get sorted out for you right away.\n\nYes, please do send over a photo \u2014 that would be a huge help. If you can capture the area where the slat holes and bolts are not lining up, as well as a wider shot showing how the rail is positioned, we can take a good look and figure out whether there is a step in the assembly guide that might resolve it, or whether something needs to be addressed on our end.\n\nCould you also confirm the email address or delivery address on the order so we can pull up order SW-20931 on our side? Once we have the photo and can locate the purchase, we will be right back to you with next steps.\n\nTO BE CONFIRMED",
+      "citations": [
+        "notebook:DELIVERY & ASSEMBLY",
+        "notebook:VOICE RULES"
+      ],
+      "why_unsure": [
+        "No past reply on file for bed frame assembly issues \u2014 the shape of the response (ask for photo, troubleshoot by description, offer to inspect) is grounded in the notebook's assembly guidance, but there is no corpus precedent to confirm exact phrasing or resolution path for this specific product.",
+        "The notebook's assembly note references the Harlow sofa range explicitly; the Calder bed frame is a different product and no Calder-specific facts are in the notebook, so I cannot confirm whether the same troubleshoot-by-photo approach applies identically.",
+        "Sign-off is flagged as 'TO BE CONFIRMED with Nora' per notebook \u2014 left as placeholder."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-wismo",
+    "sender_name": "Angela Pruitt",
+    "sender_email": "angela.pruitt@gmail.com",
+    "reply_to": "angela.pruitt@gmail.com",
+    "subject": "Order status?",
+    "body": "Hello, I placed an order about a week ago and haven't received a shipping confirmation yet. What information do you need from me to look it up? Thank you!",
+    "received_at": "Thu, 02 Jul 2026 11:02:00 -0700",
+    "result": {
+      "email_id": "sw-wismo",
+      "bucket": "Orders, Returns & Refunds",
+      "confidence": "yellow",
+      "draft": "Thank you for reaching out to Sable & Wren!\n\nHappy to look into this for you. To pull up your order, could you share the following details: your order number, the email address used at checkout, and your full name and delivery address?\n\nOnce I have those, I will track down the status and get back to you right away.\n\nTO BE CONFIRMED",
+      "citations": [
+        "notebook:Orders, Returns & Refunds",
+        "notebook:DELIVERY & ASSEMBLY",
+        "notebook:VOICE RULES (Nora's own words)"
+      ],
+      "why_unsure": [
+        "No close past reply on file to confirm exact phrasing or tone Nora uses for order-lookup requests. The info fields requested (order number, email, name, delivery address) are drawn from the notebook's assembly-issues guidance, which is the closest analog \u2014 but that note is about assembly, not general order status. The mapping is reasonable but not a direct precedent.",
+        "Sign-off is flagged as 'TO BE CONFIRMED with Nora' per notebook \u2014 cannot finalize it."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-wismo-number",
+    "sender_name": "Brian Cole",
+    "sender_email": "brian.cole@gmail.com",
+    "reply_to": "brian.cole@gmail.com",
+    "subject": "Update on my order?",
+    "body": "Hi, could you give me an update on order #SW-20988 (the Wexford bookshelf)? Just want to know where it is in transit. Thanks!",
+    "received_at": "Thu, 02 Jul 2026 11:57:00 -0700",
+    "result": {
+      "email_id": "sw-wismo-number",
+      "bucket": "Orders, Returns & Refunds",
+      "confidence": "yellow",
+      "draft": "Thank you for reaching out to Sable & Wren, Brian!\n\nI'd be happy to look into the status of your order #SW-20988 for you. I'm pulling up the details now and will get back to you with a transit update as soon as possible.\n\nIn the meantime, if you have a tracking number from your original shipping confirmation email, that's the quickest way to get a real-time location on your bookshelf.\n\nWe appreciate your patience and will be in touch shortly!",
+      "citations": [
+        "notebook:Orders, Returns & Refunds",
+        "notebook:VOICE RULES (Nora's own words)"
+      ],
+      "why_unsure": [
+        "No past reply on file to lean on for the exact phrasing or process Nora uses when looking up order transit status. The draft follows her voice rules and bucket but the specific handling steps (e.g. whether she looks it up in Shopify and replies with tracking directly, or asks the customer for more info first) are not documented in the notebook for this scenario.",
+        "The Wexford bookshelf is not a product mentioned in the store facts \u2014 cannot confirm it is a real Sable & Wren product, though this is likely just a non-Harlow item in their catalog.",
+        "No sign-off used per notebook instruction (sign-off to be confirmed with Nora)."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-cancel",
+    "sender_name": "Priyanka Rao",
+    "sender_email": "priyanka.rao@gmail.com",
+    "reply_to": "priyanka.rao@gmail.com",
+    "subject": "Cancel order #SW-21044 please",
+    "body": "I placed order #SW-21044 about an hour ago and changed my mind \u2014 can you cancel it before it goes out on the truck? I'd rather not have to send a sofa back.",
+    "received_at": "Thu, 02 Jul 2026 12:52:00 -0700",
+    "result": {
+      "email_id": "sw-cancel",
+      "bucket": "Orders, Returns & Refunds",
+      "confidence": "red",
+      "draft": "Thank you for reaching out to Sable & Wren!\n\nI completely understand \u2014 catching this early is the best way to handle it, and I am glad you got in touch quickly.\n\nI am flagging your cancellation request for order #SW-21044 right now so we can try to stop it before it ships. We will be in touch as soon as we have confirmed whether the order can be pulled.\n\nIf for any reason it has already left our warehouse, we will walk you through the next steps from there.\n\nTO BE CONFIRMED",
+      "citations": [
+        "notebook:Orders, Returns & Refunds",
+        "notebook:Store facts \u2014 RETURNS & EXCHANGES (general)",
+        "notebook:Store facts \u2014 VOICE RULES"
+      ],
+      "why_unsure": [
+        "Cancellation requires a physical action \u2014 Nora must locate order #SW-21044 in Shopify and actually cancel or intercept it before it ships. This cannot be completed by drafting alone.",
+        "No past reply on file to lean on for cancellation wording or process specifics.",
+        "Refund timing and eligibility after cancellation are not confirmed in the draft because quoting those figures requires Nora to verify the order status first.",
+        "Sign-off is marked TO BE CONFIRMED per notebook voice rules \u2014 Nora must insert her standard closing."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-warranty",
+    "sender_name": "Tom Ferris",
+    "sender_email": "tom.ferris@gmail.com",
+    "reply_to": "tom.ferris@gmail.com",
+    "subject": "Sofa frame creaking after six weeks",
+    "body": "I bought the Harlow II 3-seater about six weeks ago (order #SW-19488). The right arm creaks every time anyone sits down and this week it started to feel loose. There's no damage \u2014 nobody has stood on it. I have photos if that helps. Can I get this replaced under warranty?",
+    "received_at": "Thu, 02 Jul 2026 13:47:00 -0700",
+    "result": {
+      "email_id": "sw-warranty",
+      "bucket": "Sofas & Upholstery",
+      "confidence": "green",
+      "draft": "Thank you for reaching out to Sable & Wren!\n\nI am sorry to hear you are experiencing issues with your Harlow II \u2014 a creaking, loose arm is not something you should be dealing with six weeks in, and I completely understand why you want this sorted.\n\nThe good news is that the Harlow frame carries a 5-year warranty covering manufacturing defects, so you are well within that window. What I would like to do is get a closer look at what is happening before we take the next step.\n\nCould you please send over the photos you mentioned, along with a brief description of exactly where the looseness seems to be coming from \u2014 for example, whether it is at the point where the arm meets the back frame or lower down near the seat base? That will help us assess whether this is a defect covered under warranty and, if so, get a replacement frame section on its way to you as quickly as possible.\n\nOnce we have confirmed the issue on our end, we will arrange the replacement and send you tracking as soon as it ships.\n\nLooking forward to hearing from you and getting this resolved.",
+      "citations": [
+        "notebook:Sofas & Upholstery",
+        "notebook:Store facts \u2014 FRAME WARRANTY",
+        "notebook:Store facts \u2014 WITHIN the frame window",
+        "notebook:Store facts \u2014 VOICE RULES"
+      ],
+      "why_unsure": []
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-mattress",
+    "sender_name": "Carol Jenkins",
+    "sender_email": "carol.jenkins@aol.com",
+    "reply_to": "carol.jenkins@aol.com",
+    "subject": "Which mattress should I get?",
+    "body": "We're furnishing a guest room and I'm a side sleeper with a bad shoulder. Which of your mattresses would you recommend? And do I need a foundation to go with it?",
+    "received_at": "Thu, 02 Jul 2026 14:42:00 -0700",
+    "result": {
+      "email_id": "sw-mattress",
+      "bucket": "Needs a human",
+      "confidence": "red",
+      "draft": "Thank you for reaching out to Sable & Wren! What a lovely project \u2014 furnishing a guest room is such a nice thing to do.\n\nI want to make sure you get the right recommendation, especially given your shoulder, so I am passing your note to our team to give you a proper answer. We will be back in touch shortly with mattress suggestions and guidance on whether a foundation makes sense for your setup.\n\nTalk soon!",
+      "citations": [
+        "notebook:Product Recommendation",
+        "notebook:Store facts"
+      ],
+      "why_unsure": [
+        "The notebook lists mattresses as a product category (restocking fees mention them) but contains zero mattress-specific facts \u2014 no models, firmness levels, sleep-position guidance, or foundation requirements. There is nothing to ground a real recommendation on. Drafting a specific answer would require inventing facts, which is not permitted.",
+        "No past replies on file to lean on for mattress recommendations either.",
+        "A health-adjacent detail (bad shoulder, side sleeper) makes this higher-stakes to get wrong \u2014 better to have Nora or a product-knowledgeable team member answer."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-refund-angry",
+    "sender_name": "Marcus Bell",
+    "sender_email": "marcus.bell@hotmail.com",
+    "reply_to": "marcus.bell@hotmail.com",
+    "subject": "Still no refund \u2014 third email",
+    "body": "This is the THIRD time I've written. I returned the mattress over three weeks ago \u2014 tracking shows you received it on the 12th \u2014 and I still haven't seen a refund. If I don't hear back this week I'm disputing the charge with my card company.",
+    "received_at": "Thu, 02 Jul 2026 15:37:00 -0700",
+    "result": {
+      "email_id": "sw-refund-angry",
+      "bucket": "Escalation",
+      "confidence": "red",
+      "draft": "Thank you for reaching out to Sable & Wren \u2014 and I am truly sorry this has taken so long to resolve. I completely understand your frustration, and I want you to know this is being treated as a priority.\n\nI can see this is your third message about the same issue, and that is not the experience we want anyone to have. I am escalating your case right now to make sure the right person reviews your return for order #SW-18066 and gets back to you with a clear answer today.\n\nPlease bear with us just a little longer \u2014 someone will be in touch with you very shortly.",
+      "citations": [
+        "notebook:Escalation",
+        "notebook:Orders, Returns & Refunds",
+        "notebook:Store facts \u2014 REFUND TIMING",
+        "notebook:Store facts \u2014 RESTOCKING FEES",
+        "notebook:Store facts \u2014 VOICE RULES"
+      ],
+      "why_unsure": [
+        "This is a repeat-contact, billing dispute with a chargeback threat \u2014 it is an Escalation bucket and requires Nora to act directly.",
+        "A physical action is required: Nora must locate the return in Shopify, confirm receipt, determine whether a restocking fee applies (mattresses carry a hard 45% restocking fee per policy), and actually issue the refund \u2014 Bean cannot do any of that.",
+        "No close past reply exists to ground the draft; the draft is a holding/escalation message only and should not be sent without Nora reviewing it first.",
+        "The chargeback threat makes this legally sensitive \u2014 Nora must be looped in immediately."
+      ]
+    },
+    "thread": [
+      "Hi, I returned the mattress (order #SW-18066) last week and wanted to make sure it arrived okay. When should I expect the refund?",
+      "Following up on my return \u2014 tracking shows it was delivered to you on the 12th. Can someone confirm the refund is being processed?"
+    ]
+  },
+  {
+    "id": "sw-wholesale",
+    "sender_name": "Jenna Kowalski",
+    "sender_email": "jenna@haldenstudio.example",
+    "reply_to": "jenna@haldenstudio.example",
+    "subject": "Trade inquiry \u2014 stocking the Harlow range",
+    "body": "I run a small interior design studio in Boulder and clients ask for a sofa like the Harlow constantly. Would you be open to a trade arrangement on the Harlow sofas and the Aspen tables? We'd start around 50 pieces a year. Do you offer net-30 terms to trade accounts?",
+    "received_at": "Thu, 02 Jul 2026 16:32:00 -0700",
+    "result": {
+      "email_id": "sw-wholesale",
+      "bucket": "Wholesale",
+      "confidence": "red",
+      "draft": null,
+      "citations": [
+        "notebook:Wholesale",
+        "notebook:Store facts"
+      ],
+      "why_unsure": [
+        "Wholesale/trade bucket is explicitly marked stakes:high \u2014 requires Nora to handle directly.",
+        "No past replies on file for trade or wholesale inquiries to ground any specific claims about trade pricing, net-30 terms, eligibility, or process.",
+        "Cannot confirm whether Sable & Wren offers trade accounts, net-30 terms, or volume pricing \u2014 inventing any of those details would be fabricating facts.",
+        "A physical/business action (setting up a trade account, agreeing to terms) is required."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-multi",
+    "sender_name": "Jordan Reese",
+    "sender_email": "jordan.reese@gmail.com",
+    "reply_to": "jordan.reese@gmail.com",
+    "subject": "Fabric + doorway + a quick call?",
+    "body": "Three quick things: which fabric grade should I pick if we have a golden retriever? Will the Harlow 3-seater fit through a 30-inch doorway? And can we set up a quick call this week to walk me through the room-of-choice delivery options?",
+    "received_at": "Thu, 02 Jul 2026 17:27:00 -0700",
+    "result": {
+      "email_id": "sw-multi",
+      "bucket": "Product Recommendation",
+      "confidence": "yellow",
+      "draft": "Thank you for reaching out to Sable & Wren, Jordan!\n\nHappy to help with all three \u2014 let me take them in turn.\n\nFor a household with a golden retriever, we would steer you toward Performance Weave. It is our stain- and scratch-resistant fabric grade, and it is exactly what we recommend for homes with pets. Everyday Weave is a lovely cotton-linen blend but it will show wear from claws and dander more readily, and Full-Grain Leather wipes clean beautifully but is not scratch-proof, so a dog with active paws can mark it over time. Performance Weave is the clear choice here. If you would like to feel the difference before committing, we ship swatch cards of all three fabric grades free of charge \u2014 just say the word and we will get a set out to you.\n\nOn the doorway question: yes, the Harlow 3-seater will clear a 30-inch doorway. The legs unscrew for delivery, and with the legs off the frame sits at 29 inches deep, so it passes through a 30-inch opening with just an inch to spare. Worth measuring the full path \u2014 hallways, any turns \u2014 but the doorway itself should not be a problem.\n\nOn setting up a call: we are a small team running support through this inbox, and we do not have a phone or scheduling line to offer. That said, I am very happy to walk you through the room-of-choice delivery options right here over email \u2014 it is genuinely the fastest way to get you accurate answers, and I can be thorough. Just let me know what questions you have and I will get back to you quickly.\n\nTO BE CONFIRMED",
+      "citations": [
+        "notebook:Sofas & Upholstery",
+        "notebook:Store facts"
+      ],
+      "why_unsure": [
+        "No past reply on file to corroborate voice or phrasing \u2014 relying entirely on notebook stated policy.",
+        "The call/scheduling deflection is inferred from the notebook describing support as an inbox run by Nora with no mention of phone or scheduling tools \u2014 this is not explicitly stated as policy, so it may be wrong.",
+        "Sign-off is placeholder per notebook instruction (TO BE CONFIRMED with Nora)."
+      ]
+    },
+    "thread": []
+  },
+  {
+    "id": "sw-newsletter",
+    "sender_name": "Packaging Digest",
+    "sender_email": "newsletter@packagingdigest.com",
+    "reply_to": "newsletter@packagingdigest.com",
+    "subject": "This week: 10 sustainable packaging trends \ud83d\udce6",
+    "body": "Hi there! Your weekly Packaging Digest is here.\n\nThis week's top stories: compostable mailers, the rise of mono-material pouches, and 8 more trends shaping DTC packaging in 2026.\n\nRead the full roundup on our site. You're receiving this because you subscribed. Unsubscribe anytime.",
+    "received_at": "Thu, 02 Jul 2026 18:22:00 -0700",
+    "result": {
+      "disposition": "filed",
+      "kind": "newsletter",
+      "reason": "A weekly newsletter from Packaging Digest \u2014 no question or action required from the business."
+    },
+    "thread": []
+  }
+]

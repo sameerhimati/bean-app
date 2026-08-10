@@ -1,0 +1,452 @@
+{
+  "categories": [
+    {
+      "name": "Sofas & Upholstery",
+      "description": "Anything about the Harlow sofa range — fabric grades, dimensions and doorway fit, cushions, frame, warranty, returns.",
+      "template": null,
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Orders, Returns & Refunds",
+      "description": "Where-is-my-order, missed delivery windows, cancellations, refund status/timing, and general return-eligibility / restocking-fee questions across products.",
+      "template": null,
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Product Recommendation",
+      "description": "Which piece should I buy — which sofa, which table, which mattress. Advice, not a specific order.",
+      "template": null,
+      "alwaysEscalate": false
+    },
+    {
+      "name": "Wholesale",
+      "description": "Bulk / B2B / trade / stockist / affiliate / net-terms inquiries from a business.",
+      "template": null,
+      "alwaysEscalate": true
+    },
+    {
+      "name": "Escalation",
+      "description": "Angry, repeat-contact, billing dispute, chargeback, legal threat, money exception, or anything needing Nora now.",
+      "template": null,
+      "alwaysEscalate": true
+    }
+  ],
+  "knowledgeDocs": [
+    {
+      "title": "company-info",
+      "body": "Sable & Wren is a small mid-market furniture retailer — sofas, dining, beds and storage. Support inbox is hello@sableandwren.example, run by Nora. We reply to every customer in a warm, professional, personal voice. Ship-back / returns address: Sable & Wren Returns, 1120 Harbor Rd #204, Astoria, OR 97103. Store policies live at https://sableandwren.example/pages/return-policy. Founder Rae is referenced in some replies (e.g. the floor-model recommendation)."
+    },
+    {
+      "title": "delivery-and-assembly",
+      "body": "DELIVERY & ASSEMBLY. Threshold delivery (front door, ground floor) is standard; room-of-choice and White-Glove (unwrap, assemble, take the packaging away) are paid upgrades booked at checkout. Assembly issues: ask for the order number / email / name / delivery address to locate the purchase, offer to troubleshoot by photo/description over email. If they want someone to come out and do the assembly, that requires a paid White-Glove Assembly visit — otherwise the Assembly Guide walks them through it. Returns of assembled items carry a 20% restocking fee (flag for Nora)."
+    },
+    {
+      "title": "frame-warranty",
+      "body": "FRAME WARRANTY — SEPARATE from the 30-day return window, do NOT conflate.\nHarlow frames carry a 5-year warranty for MANUFACTURING DEFECTS ONLY; cushions and fabric carry 1 year. Step one on any sofa fault: find the delivery date in Shopify and check which window it falls in.\nWITHIN the frame window: gather info (what's wrong, a photo for records, confirm the order). If confirmed a frame defect with no impact damage or misuse, ship a replacement frame section or a replacement piece; customer gets tracking when it ships.\nOUTSIDE the window: no free replacement. Offer a personalized % off (e.g. 15%) toward the current collection — the DISCOUNT CODE IS CREATED MANUALLY BY NORA. Bean drafts the message and flags for Nora to create/insert the code."
+    },
+    {
+      "title": "return-policy",
+      "body": "RETURNS & EXCHANGES (general). Accepted within 30 days of delivery, item must be NEW, UNUSED and unassembled. See https://sableandwren.example/pages/return-policy.\nSofas: within 30 days we make an exception for STORE CREDIT (not cash refund) — see sofa-returns for the wrapped-vs-unwrapped rules.\nClearance and floor-model pieces: FINAL SALE, no returns.\nRESTOCKING FEES (charged when an item comes back damaged / cannot be sold as new): Mattresses 45% (hard rule). Dining tables & bed frames 25% (hard rule). Rugs & curtains 20%. Assembled items 20%.\nREFUND TIMING: 3–5 business days to appear.\nNOTE: these numbers are policy. Bean should NOT quote a fee or process a refund on its own — restocking / refund / cancellation replies are flagged for Nora (stakes:high)."
+    },
+    {
+      "title": "sofa-product-info",
+      "body": "HARLOW SOFA RANGE.\nDesign: kiln-dried hardwood frame, corner-blocked and doweled; sinuous-spring seat base; feather-wrapped foam cushions; legs unscrew for delivery access.\nFabric grades (3 types): Everyday Weave (cotton-linen blend, our standard), Performance Weave (stain- and scratch-resistant — the grade we recommend for households with pets or small children), Full-Grain Leather (wipes clean and ages to a patina, but is not scratch-proof). A home with dogs and a toddler wants Performance Weave. Swatch cards of all three ship free. We do NOT sell or accept customer's-own-material (COM) upholstery and do not recommend third-party fabric protectors.\nDimensions: 3-seater 84\" W × 38\" D × 33\" H; 2-seater 62\" W; sectional 112\" W. Seat height 18\". With the legs off the 3-seater frame is 29\" deep, so it clears a 30\" doorway; the sectional splits into two pieces at the chaise seam. Only one seat depth is offered per collection.\nCollections: HARLOW II (2026) — deeper seat, tighter frame joinery, all three fabric grades. HARLOW I (2025) — same frame construction and cushion fill, shallower seat, Everyday Weave and Full-Grain Leather only. Both share the hardwood frame, sinuous-spring base, removable legs and cushion fill. Recommend Harlow II for seat depth and fabric choice; Harlow I if the customer wants the same frame for less and doesn't need Performance Weave.\nLifespan: the frame is built to outlast the upholstery — reupholstery mid-life is normal, not a failure."
+    },
+    {
+      "title": "sofa-returns",
+      "body": "SOFA RETURNS / EXCHANGES (money — flag for Nora).\nReturn within 30 days: if STILL WRAPPED and unassembled → full refund minus original delivery. If UNWRAPPED and used → we typically do NOT accept returns (upholstery is cut to order and cannot be sold as new); we can offer STORE CREDIT minus delivery.\nWrong fabric grade ordered: if STILL WRAPPED → exchange to the correct grade. If UNWRAPPED → offer a swap from the floor-model pool; customer covers freight both ways (~$149 return freight; ~$298 total); cannot guarantee an exact dye-lot match to the original.\nShip-back address: Sable & Wren Returns, 1120 Harbor Rd #204, Astoria, OR 97103."
+    },
+    {
+      "title": "voice-and-tone",
+      "body": "VOICE RULES (Nora's own words).\nAlways sound professional, helpful, and empathetic — this is customer service, the customer should feel heard and understood. Be helpful with clear, concise answers.\nDO NOT say 'I am sorry you feel this way' or 'I'm sorry you do not like the product.' Avoid emotional 'sorry.' You MAY say sorry in a non-emotional way (e.g. 'I am sorry to hear you are experiencing issues with your product').\nNEVER say 'it sounds like you received a defective piece.' Instead: 'I am sorry to hear that you are experiencing issues with your product. If you can send photos of the piece and of the area you are seeing the problem, we are happy to have it inspected, and if found to be defective, replace it.'\nOpen replies with a greeting like 'Thank you for reaching out to Sable & Wren!' Sign-off: TO BE CONFIRMED with Nora (do not invent one)."
+    }
+  ],
+  "settings": {
+    "shopifyStore": "sable-and-wren",
+    "orderPrefixes": "SW",
+    "storeDomains": "sableandwren.example"
+  },
+  "tree": [
+    {
+      "nodeType": "category",
+      "label": "Sofas & Upholstery",
+      "trigger": "",
+      "children": [
+        {
+          "nodeType": "answer",
+          "label": "Sagging or squeaking",
+          "trigger": "Seat sags, frame creaks, or a joint feels loose.",
+          "answer": "Gather the order, ask which seat and when it started, ask for a photo, then check the frame window.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Cushion cover issue",
+          "trigger": "Zip, seam, or a cover that no longer fits after washing.",
+          "answer": "Covers are not machine washable; offer a replacement cover and confirm the fabric grade on the order.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Which fabric grade",
+          "trigger": "Which of the three grades to pick — pets, children, wear, cleaning.",
+          "answer": "Everyday Weave is standard; Performance Weave for pets or small children; Full-Grain Leather wipes clean but scratches. Free swatch cards.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Dimensions & doorway fit",
+          "trigger": "Will it fit — doorway, stairwell, lift, room measurements.",
+          "answer": "Give the collection's dimensions, note the legs unscrew (3-seater clears 30\" with legs off) and the sectional splits at the chaise seam.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Harlow I vs Harlow II",
+          "trigger": "Which collection, what changed between them.",
+          "answer": "Same frame and fill; Harlow II has a deeper seat and all three fabric grades, Harlow I is Everyday Weave and Leather only.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Warranty claim (within 5 years)",
+          "trigger": "Frame fault inside the frame warranty window.",
+          "answer": "Confirm the delivery date in Shopify, gather photos, replace the frame section if confirmed defective with no impact damage.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Outside warranty / discount",
+          "trigger": "Frame fault outside the window.",
+          "answer": "No free replacement; offer a personalized % off the current collection. Nora creates the code.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Return / exchange",
+          "trigger": "Wants to send the sofa back or swap the fabric grade.",
+          "answer": "Wrapped and unassembled is a refund minus delivery; unwrapped is store credit. Flag the money for Nora.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "escalate",
+          "label": "Other sofa question (no template yet)",
+          "trigger": "Anything about the Harlow range with no answer node yet.",
+          "provenance": "system"
+        }
+      ]
+    },
+    {
+      "nodeType": "category",
+      "label": "Orders, Returns & Refunds",
+      "trigger": "",
+      "children": [
+        {
+          "nodeType": "answer",
+          "label": "Where is my order",
+          "trigger": "Where is it, has it shipped, no confirmation yet.",
+          "answer": "Look the order up by number, email, name or delivery address and give the real status and tracking.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Missed delivery window",
+          "trigger": "The carrier did not arrive in the booked window.",
+          "answer": "Apologise without emotional sorry, confirm the order, and rebook the window.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Cancel order",
+          "trigger": "Wants to cancel before it ships.",
+          "answer": "State the cancellation policy. Any exception or exact refund amount is Nora's.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Refund status / timing",
+          "trigger": "Where is my refund, how long does it take.",
+          "answer": "Refunds take 3–5 business days to appear once issued. Whether it was issued is Nora's.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "answer",
+          "label": "Return eligibility / restocking fee",
+          "trigger": "Can I return this, what will it cost me.",
+          "answer": "30 days, new, unused and unassembled. Never quote a restocking fee — flag for Nora.",
+          "stakes": "high"
+        },
+        {
+          "nodeType": "escalate",
+          "label": "Other order question (no template yet)",
+          "trigger": "An order question with no answer node yet.",
+          "provenance": "system"
+        }
+      ]
+    },
+    {
+      "nodeType": "category",
+      "label": "Product Recommendation",
+      "trigger": "",
+      "children": [
+        {
+          "nodeType": "answer",
+          "label": "Best sofa for pets",
+          "trigger": "Which sofa or fabric holds up to animals and children.",
+          "answer": "Performance Weave on either collection; Harlow II if they want the deeper seat.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "escalate",
+          "label": "Other recommendation (no template yet)",
+          "trigger": "A which-should-I-buy question with no answer node yet.",
+          "provenance": "system"
+        }
+      ]
+    },
+    {
+      "nodeType": "category",
+      "label": "Delivery & Assembly",
+      "trigger": "",
+      "children": [
+        {
+          "nodeType": "answer",
+          "label": "Assembly / parts not lining up",
+          "trigger": "Followed the sheet and the parts do not line up.",
+          "answer": "Ask for the order number / email / name / delivery address, offer photo troubleshooting, and point at the paid White-Glove Assembly visit if they want it done for them.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "action",
+          "label": "Schedule a delivery call",
+          "trigger": "Wants a call to walk through delivery or assembly options.",
+          "answer": "Draft the offer; the actual booking is Nora's."
+        },
+        {
+          "nodeType": "escalate",
+          "label": "Return (20% restocking) / other (no template yet)",
+          "trigger": "Assembled-item return, or a delivery question with no answer node yet.",
+          "provenance": "system"
+        }
+      ]
+    },
+    {
+      "nodeType": "category",
+      "label": "Dining & Tables",
+      "trigger": "",
+      "children": [
+        {
+          "nodeType": "answer",
+          "label": "Extension leaf compatibility",
+          "trigger": "Does the leaf, bench or chair fit this table.",
+          "answer": "Answer from the dining spec; the Aspen leaf fits Aspen tables only.",
+          "stakes": "low"
+        },
+        {
+          "nodeType": "escalate",
+          "label": "Other dining question (no template yet)",
+          "trigger": "A dining question with no answer node yet.",
+          "provenance": "system"
+        }
+      ]
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Mattresses",
+      "trigger": "Any mattress question — which one, foundations, trials, returns."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Rugs",
+      "trigger": "Any rug question — sizing, pile, pads, returns."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Curtains & Blinds",
+      "trigger": "Any curtain or blind question — drop, fitting, returns."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Office Chairs",
+      "trigger": "Any desk-chair question — sizing, gas lift, casters, warranty."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Outdoor",
+      "trigger": "Any outdoor-furniture question — weathering, covers, storage."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Lighting",
+      "trigger": "Any lighting question — bulbs, fittings, shades, clearance stock."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Media Consoles",
+      "trigger": "Any media-console question — cable management, weight limits, doors."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Nightstands",
+      "trigger": "Any nightstand question — drawer runners, finishes, pairs."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Bedding & Linens",
+      "trigger": "Any bedding, throw or cushion-cover question — sizing, care, colour."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "Ottomans",
+      "trigger": "Any ottoman question — storage lids, fabric grades, pairing."
+    },
+    {
+      "nodeType": "escalate",
+      "label": "General / New / Needs Nora",
+      "trigger": "Wholesale, press, partnerships, anything angry, and anything with no home above."
+    }
+  ],
+  "proposals": [
+    {
+      "id": "prop-mattress",
+      "kind": "template",
+      "path": [
+        "Mattresses"
+      ],
+      "label": "Mattresses",
+      "nodeType": "answer",
+      "trigger": "Customer writes about a mattress — which one to buy, firmness or a foundation, the sleep trial, or an exchange or return.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd be glad to help with your mattress question. Could you share which mattress you have (or are looking at), how you sleep or what you'd like to do, and — if you've already ordered — the order number or the name or email on the order? If you're asking about a return or exchange, those are handled per our return policy, and I'll confirm the exact details for your specific order. I'll follow up with a full answer as soon as I have this from you.",
+      "stakes": "high",
+      "evidence": "Mattress email often involves returns/exchanges (money — your policy doc has a hard restocking rule) and Bean has no answer yet — this starter gathers the basics and leaves the policy specifics to you; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-rug",
+      "kind": "template",
+      "path": [
+        "Rugs"
+      ],
+      "label": "Rugs",
+      "nodeType": "answer",
+      "trigger": "Customer writes about a rug — which size for a room, pile height or pads, shedding, or a rug that arrived creased.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd be happy to help with your rug question. Could you let me know which rug you have (or are considering) and your room measurements or what you're seeing? If this is about an existing order, the order number — or the name, email, or delivery address on the order — will help me pull up the details. Once I have that, I'll get back to you with a full answer.",
+      "stakes": "low",
+      "evidence": "You get rug email (sizing, pads, creasing per your folders) but Bean has no answer for it yet — this starter only gathers what you'd need; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-curtains",
+      "kind": "template",
+      "path": [
+        "Curtains & Blinds"
+      ],
+      "label": "Curtains & Blinds",
+      "nodeType": "answer",
+      "trigger": "Customer writes about curtains or blinds — which drop or width, fitting, blackout lining, or a return.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd be glad to help with your curtain question. Could you share which style and size you have (or are looking at), your window measurements, and — if you've already ordered — the order number or the name or email on the order? If you're asking about a return, curtain returns are handled per our return policy, and I'll confirm the exact details for your order. I'll follow up with a full answer as soon as I have this.",
+      "stakes": "high",
+      "evidence": "Curtain and blind email often involves returns (money — your policy doc has a restocking rule) and Bean has no answer yet — this starter gathers the basics and leaves the fee specifics to you; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-office-chair",
+      "kind": "template",
+      "path": [
+        "Office Chairs"
+      ],
+      "label": "Office Chairs",
+      "nodeType": "answer",
+      "trigger": "Customer writes about a desk chair — which model, the gas lift, casters for hard floors, weight rating, or it not adjusting as expected.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! Happy to help with your chair question. Could you let me know which chair you have (or are considering), your floor type or what you're trying to adjust, and — if this relates to an existing order — the order number or the name or email on the order? With that, I'll get you a proper answer right away.",
+      "stakes": "low",
+      "evidence": "You get desk-chair email (gas lift, casters, weight rating per your folders) but Bean has no answer yet — this starter just gathers what you'd need; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-lighting",
+      "kind": "template",
+      "path": [
+        "Lighting"
+      ],
+      "label": "Lighting",
+      "nodeType": "answer",
+      "trigger": "Customer writes about lighting — which fitting or shade, bulb type and wattage, dimmer compatibility, or a clearance light.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd love to help with your lighting question. Could you tell me which fitting you have (or are considering) and what you'd like to know? If it's about an existing order, the order number or the name or email on the order will help me look it up. I'll follow up with a full answer shortly.",
+      "stakes": "low",
+      "evidence": "You get lighting email but Bean has no answer yet — this starter only gathers the basics; note your policy doc says clearance and floor-model pieces are final sale, so any return-type reply stays with you. Approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-outdoor",
+      "kind": "template",
+      "path": [
+        "Outdoor"
+      ],
+      "label": "Outdoor",
+      "nodeType": "answer",
+      "trigger": "Customer writes about outdoor furniture — how it weathers, covers, winter storage, or which set to choose.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd be glad to help with your outdoor question. Could you let me know which piece or set you have (or are considering) and a bit about where it will live or what you're running into? If this is about an existing order, please include the order number or the name or email on the order. Once I have that, I'll get back to you with a full answer.",
+      "stakes": "low",
+      "evidence": "You get outdoor email but Bean has no answer for it yet — this starter just gathers what you'd need; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-media-console",
+      "kind": "template",
+      "path": [
+        "Media Consoles"
+      ],
+      "label": "Media Consoles",
+      "nodeType": "answer",
+      "trigger": "Customer writes about a media console — cable routing, shelf weight limits, a door that won't sit flush, or another question about the piece.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'm happy to help with your media console question. If something isn't sitting right, I'm sorry to hear that — could you describe what's happening and, if you can, attach a photo for our records? Please also include the order number or the name or email on the order so I can pull up the details. I'll follow up with a full answer as soon as I have this.",
+      "stakes": "low",
+      "evidence": "You get media-console email (cable routing, a door out of true per your folders) but Bean has no answer yet — this starter gathers the basics in your voice (no defective-product language); approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-nightstand",
+      "kind": "template",
+      "path": [
+        "Nightstands"
+      ],
+      "label": "Nightstands",
+      "nodeType": "answer",
+      "trigger": "Customer writes about a nightstand — drawer runners, matching a finish, buying a second one, or it arriving marked.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd be glad to help with your nightstand question. Could you let me know which nightstand you have, what you're seeing or trying to do, and — if this relates to an existing order — the order number or the name, email, or delivery address on the order? If you'd like, a photo helps a lot too. I'll get back to you with a full answer once I have this.",
+      "stakes": "low",
+      "evidence": "You get nightstand email (drawer runners, finish matching per your folders) but Bean has no answer yet — this starter just gathers what you'd need; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-dining-chairs",
+      "kind": "template",
+      "path": [
+        "Dining Chairs"
+      ],
+      "label": "Dining Chairs",
+      "nodeType": "answer",
+      "trigger": "Customer writes about dining chairs — which finish, seat height against a table, buying extras later, or a wobble.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! Happy to help with your dining chair question. Could you let me know which chairs you have (and which table you're pairing them with), what's happening, and the order number or the name or email on the order? If something isn't right, I'm sorry to hear you're experiencing issues — a photo is helpful for our records. I'll follow up with a full answer as soon as I have this.",
+      "stakes": "low",
+      "evidence": "You get dining-chair email (finishes, seat height, wobble per your folders) but Bean has no answer yet — this starter gathers the basics; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-bedding",
+      "kind": "template",
+      "path": [
+        "Bedding & Linens"
+      ],
+      "label": "Bedding & Linens",
+      "nodeType": "answer",
+      "trigger": "Customer writes about bedding, throws or cushion covers — which size, how to care for it, colour matching, or a question about their order.",
+      "answer": "Hi {name}, thank you for reaching out to Sable & Wren! I'd love to help with your question. Could you let me know which item you're asking about (bedding, a throw, or a cushion cover) and what you'd like to know? If this is about an existing order, please include the order number or the name or email on the order. Once I have that, I'll get back to you with a full answer.",
+      "stakes": "low",
+      "evidence": "You get email about the bedding and soft-furnishing line but Bean has no answer yet — this starter just gathers what you'd need; approve, edit, or dismiss it."
+    },
+    {
+      "id": "prop-wholesale",
+      "kind": "node",
+      "path": [],
+      "label": "Wholesale & partnerships",
+      "nodeType": "escalate",
+      "trigger": "A business or reseller writes about bulk or wholesale pricing, becoming a stockist or retail partner, a trade or interior-design account, an affiliate or ambassador program, or purchasing on net terms / with a purchase order.",
+      "answer": "",
+      "stakes": "low",
+      "evidence": "Wholesale exists in your flat categories (marked always-escalate) and in Bean's intake questionnaire, but has no home in the tree — these emails currently land in General. A dedicated branch gives cleaner data and a future template home."
+    }
+  ]
+}

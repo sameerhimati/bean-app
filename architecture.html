@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bean — Architecture Reference</title>
+<style>
+  :root {
+    /* palette borrowed (lightly) from Bean's web/ styling */
+    --cream:    #F4EEE1;
+    --cream-2:  #FBF7EE;
+    --paper:    #FFFDF8;
+    --ink:      #2C2620;
+    --ink-soft: #6E6457;
+    --ink-faint:#9A8F7E;
+    --line:     #E7DECE;
+    --line-soft:#EFE8DA;
+    --bean:     #6E4327;   /* the one accent */
+    --green:    #2E7D3E;
+    --green-bg: #EAF6EC;
+    --green-line:#BFE3C6;
+    --amber:    #B07D14;
+    --amber-bg: #FBF1DA;
+    --amber-line:#EAD6A2;
+    --red:      #B5462E;
+    --red-bg:   #FBE7E0;
+    --red-line: #F1C3B4;
+    --proton:   #6d4aff;
+    --shadow:   0 1px 2px rgba(58,48,32,.04), 0 6px 18px rgba(58,48,32,.06);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, "Courier New", monospace;
+    --content: 900px;
+    --nav: 232px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: #e7d9c2; }
+
+  /* ---- layout ---- */
+  .shell { display: flex; align-items: flex-start; max-width: calc(var(--content) + var(--nav) + 64px); margin: 0 auto; }
+
+  nav.toc {
+    position: sticky; top: 0; align-self: flex-start;
+    width: var(--nav); flex: none;
+    height: 100vh; overflow-y: auto;
+    padding: 40px 22px 40px 28px;
+  }
+  nav.toc .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 800; font-size: 18px; color: var(--bean);
+    letter-spacing: -.2px; margin-bottom: 4px;
+  }
+  nav.toc .brand .dot { width: 11px; height: 11px; border-radius: 999px; background: var(--bean); flex: none; }
+  nav.toc .tagline { font-size: 12px; color: var(--ink-faint); margin: 0 0 24px; line-height: 1.4; }
+  nav.toc a {
+    display: block; text-decoration: none;
+    color: var(--ink-soft); font-size: 13.5px;
+    padding: 6px 11px; border-radius: 8px;
+    border-left: 2px solid transparent;
+    transition: background .12s, color .12s;
+  }
+  nav.toc a:hover { background: var(--cream-2); color: var(--ink); }
+  nav.toc a.active { color: var(--bean); background: var(--paper); border-left-color: var(--bean); font-weight: 700; }
+
+  main {
+    flex: 1 1 auto; min-width: 0;
+    max-width: var(--content);
+    background: var(--paper);
+    margin: 28px 0;
+    padding: 52px 60px 80px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---- typography ---- */
+  h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.6px; margin: 0 0 6px; }
+  .doc-sub { font-size: 14px; color: var(--ink-faint); margin: 0 0 8px; }
+  h2 {
+    font-size: 23px; letter-spacing: -.3px; margin: 56px 0 4px;
+    padding-top: 18px; scroll-margin-top: 20px;
+  }
+  h2:first-of-type { margin-top: 30px; }
+  h3 { font-size: 16px; letter-spacing: 0; margin: 28px 0 6px; color: var(--bean); }
+  .lede { font-size: 14px; color: var(--ink-soft); margin: 2px 0 16px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--bean); }
+  hr { border: none; border-top: 1px solid var(--line-soft); margin: 0; }
+  code {
+    font-family: var(--mono); font-size: .86em;
+    background: var(--cream-2); border: 1px solid var(--line-soft);
+    border-radius: 5px; padding: 1px 5px; color: #5a4a36;
+  }
+  strong { color: var(--ink); }
+
+  /* ---- diagram cards ---- */
+  .diagram {
+    background: var(--cream-2);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 18px;
+    margin: 18px 0 10px;
+    overflow-x: auto;
+  }
+  .diagram .mermaid { display: flex; justify-content: center; }
+  .diagram-cap { font-size: 12.5px; color: var(--ink-faint); margin: 0 4px 14px; text-align: center; }
+
+  /* ---- table ---- */
+  .table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left; background: var(--cream-2);
+    color: var(--ink-soft); font-weight: 700; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .5px;
+    padding: 11px 16px; border-bottom: 1px solid var(--line);
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--cream-2); }
+  td code, th code { white-space: nowrap; }
+  .col-mod { white-space: nowrap; }
+
+  /* ---- callout boxes ---- */
+  .callout {
+    border: 1px solid var(--line); border-left-width: 4px;
+    border-radius: 10px; padding: 16px 20px; margin: 16px 0;
+    background: var(--paper);
+  }
+  .callout .k { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; display: block; margin-bottom: 4px; }
+  .callout h4 { margin: 0 0 8px; font-size: 16px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.bean  { border-left-color: var(--bean);  background: linear-gradient(0deg, var(--paper), var(--cream-2)); }
+  .callout.bean .k  { color: var(--bean); }
+  .callout.amber { border-left-color: var(--amber); background: var(--amber-bg); }
+  .callout.amber .k { color: var(--amber); }
+  .guard {
+    font-size: 12.5px; color: var(--ink-soft); margin-top: 10px;
+    padding-top: 10px; border-top: 1px dashed var(--line);
+  }
+  .guard b { color: var(--ink); }
+
+  /* ---- two-column ---- */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .col-card { border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; background: var(--paper); }
+  .col-card.shipped { border-top: 3px solid var(--green); }
+  .col-card.pending { border-top: 3px solid var(--amber); }
+  .col-card h4 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .col-card h4 .pip { width: 9px; height: 9px; border-radius: 999px; flex: none; }
+  .col-card.shipped .pip { background: var(--green); }
+  .col-card.pending .pip { background: var(--amber); }
+  .col-card .meta { font-size: 12px; color: var(--ink-faint); margin: 0 0 12px; }
+  .col-card ul { margin: 0; padding-left: 18px; }
+  .col-card li { margin-bottom: 9px; font-size: 13.5px; line-height: 1.5; }
+  .col-card li b { color: var(--ink); }
+
+  .north-star {
+    margin-top: 18px; border: 1.5px dashed var(--bean); border-radius: 12px;
+    padding: 16px 20px; background: var(--cream-2); font-size: 14px;
+  }
+  .north-star b { color: var(--bean); }
+
+  /* ---- bucket legend ---- */
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 0; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1px solid; }
+  .chip .pip { width: 9px; height: 9px; border-radius: 999px; }
+  .chip.high { color: var(--green); background: var(--green-bg); border-color: var(--green-line); }
+  .chip.high .pip { background: var(--green); }
+  .chip.low  { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-line); }
+  .chip.low .pip  { background: var(--amber); }
+  .chip.flag { color: var(--red); background: var(--red-bg); border-color: var(--red-line); }
+  .chip.flag .pip { background: var(--red); }
+
+  /* ---- json block ---- */
+  pre.json {
+    background: #2C2620; color: #f0e8d8;
+    border-radius: 12px; padding: 18px 20px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+    margin: 14px 0;
+  }
+  pre.json .key { color: #d9b88a; }
+  pre.json .str { color: #b5cf9a; }
+  pre.json .lit { color: #cfa0e0; }
+  pre.json code { background: none; border: none; padding: 0; color: inherit; }
+
+  .footnote { font-size: 13px; color: var(--ink-faint); margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+
+  @media (max-width: 1080px) {
+    nav.toc { display: none; }
+    main { margin: 0; border-radius: 0; padding: 40px 28px 64px; }
+    .cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="brand"><span class="dot"></span> Bean</div>
+    <p class="tagline">Architecture reference</p>
+    <a href="#what">What Bean is</a>
+    <a href="#pipeline">Triage pipeline</a>
+    <a href="#learning">The learning loop</a>
+    <a href="#bridge">UI ↔ engine bridge</a>
+    <a href="#onboarding">Onboarding &amp; operating model</a>
+    <a href="#modules">Module table</a>
+    <a href="#invariants">Load-bearing invariants</a>
+    <a href="#config">Config-as-data spine</a>
+    <a href="#boundaries">Shipped vs pending</a>
+  </nav>
+
+  <main>
+    <h1>Bean — Architecture Reference</h1>
+    <p class="doc-sub">The architecture reference for Bean — the triage engine + the closed learning loop. Last updated 2026-06-25.</p>
+
+    <div class="callout amber">
+      <span class="k">Historical design record</span>
+      <h4>This page documents the 2026-06 engine, which has since been replaced.</h4>
+      <p>
+        The flat classify → assess → <code>route()</code> pipeline below (<code>bean/routing.py</code>,
+        <code>bean/loop.py</code>, <code>bean/prompts.py</code>) was superseded first by the routing tree and
+        then by the single-call notebook engine. Read it as the design
+        record of that era, not as a description of current behavior.
+      </p>
+    </div>
+
+    <!-- ============ WHAT BEAN IS ============ -->
+    <section>
+      <h2 id="what">What Bean is</h2>
+      <p>
+        Me Bean. Bean is a <strong>human-in-the-loop email triage and reply-drafting agent</strong> for a solo
+        operator running ecommerce customer support on Proton Mail. Bean reads an incoming email, categorizes it
+        into one of the operator's pre-defined fields, drafts a grounded reply from the matching template, and routes the
+        result into one of three confidence buckets — <strong>HIGH</strong> (one-tap approve),
+        <strong>LOW</strong> (needs a look), or <strong>FLAG</strong> (escalate, no draft). It never autosends.
+      </p>
+
+      <div class="callout bean">
+        <span class="k">The actual product</span>
+        <h4>The thesis is calibrated uncertainty, not the drafting.</h4>
+        <p>
+          Matching email → category → template is the throwaway 80%. The product is the 20% where there is no
+          obvious answer. A <strong>yes-man that always emits a confident reply is worse than nothing</strong> —
+          the operator would have to re-read everything, so no time is saved. The moat is Bean's ability to know when
+          it is <em>not</em> confident, so the operator can trust the HIGH bucket blindly and spend attention only
+          where it is needed. Every factual claim in a draft must trace to a held source; if it cannot be
+          grounded, Bean does not fabricate — it escalates. This <strong>"source-grounded or ask"</strong> rule
+          is the acceptance invariant of the whole system.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ TRIAGE PIPELINE ============ -->
+    <section>
+      <h2 id="pipeline">The triage pipeline</h2>
+      <p class="lede">
+        One <code>Email</code> through <code>triage()</code> → a cached system prefix → the classify leg → a
+        branch → the assess leg → a pure-deterministic <code>route()</code> into one of three outcomes.
+      </p>
+      <div class="legend">
+        <span class="chip high"><span class="pip"></span> HIGH — one-tap approve</span>
+        <span class="chip low"><span class="pip"></span> LOW — your call, here's why</span>
+        <span class="chip flag"><span class="pip"></span> FLAG — no good answer, escalate</span>
+      </div>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+    email["Email<br/>id, sender, subject, body,<br/>thread[], image_paths[]"]
+
+    subgraph build["triage() builds the request"]
+      prefix["CACHED system prefix<br/>build_system_prefix(Config + KnowledgeStore)<br/>byte-identical · one cache_control block"]
+      images["images= content blocks<br/>customer attachments + the operator's KB screenshots<br/>BYPASS the cached text prefix"]
+    end
+
+    email --> prefix
+    prefix --> classify
+    images -. content blocks .-> classify
+    images -. content blocks .-> assess
+
+    classify["CLASSIFY leg — Haiku<br/>claude-haiku-4-5<br/>→ category, clarity, rationale"]
+    classify --> branch{"category has a template<br/>AND not always_escalate?"}
+
+    branch -- "no template OR always_escalate" --> flagEarly>"FLAG — escalate, no draft<br/>briefing for the operator"]:::flag
+
+    branch -- "has template" --> assess["ASSESS leg — Sonnet<br/>claude-sonnet-4-6<br/>drafts · scores coverage/stakes<br/>cites sources · lists ungrounded facts"]
+
+    assess --> route{"route()<br/>pure deterministic map"}
+
+    route -- "ungrounded + high-stakes" --> flagLate>"FLAG — won't fake it<br/>escalate, no draft"]:::flag
+    route -- "clear + full + grounded + cited" --> high["HIGH — one-tap approve<br/>draft + citations"]:::high
+    route -- "anything else" --> low["LOW — your call<br/>draft + concerns + bean_note"]:::low
+
+    classDef high fill:#EAF6EC,stroke:#2E7D3E,stroke-width:2px,color:#1f5a2c;
+    classDef low  fill:#FBF1DA,stroke:#B07D14,stroke-width:2px,color:#7a5410;
+    classDef flag fill:#FBE7E0,stroke:#B5462E,stroke-width:2px,color:#7a2e1c;
+        </pre>
+      </div>
+      <p class="diagram-cap">
+        Images (customer photo attachments + the operator's KB screenshots) enter as <code>image</code> content blocks
+        passed to <em>both</em> model legs — they ride outside the cached text prefix, so the prefix stays
+        text-only and byte-identical.
+      </p>
+    </section>
+
+    <!-- ============ THE LEARNING LOOP ============ -->
+    <section>
+      <h2 id="learning">The learning loop</h2>
+      <p class="lede">
+        The triage engine is the throwaway 80%. The moat is that Bean gets <em>better at the operator's
+        voice and judgment with every correction</em> — a closed loop: capture every human action,
+        then feed their past decisions back into the next draft. Shipped 2026-06-25, provider-agnostic.
+      </p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+    subgraph capture["CAPTURE — every human action is a signal"]
+      act["Operator: approve · edit · take-over · snooze<br/>+ recategorize (the dropdown)"]
+      post["POST /api/correction"]
+      log[("corrections.jsonl<br/>per-customer, on the volume<br/>the moat — survives redeploys")]
+      act --> post --> log
+    end
+
+    subgraph use["USE — past decisions shape the next draft"]
+      sel["corrections.few_shot_examples()<br/>same-category · most-recent K"]
+      inject["injected into the ASSESS user message<br/>NEVER the cached prefix"]
+      draft["better draft — in their voice"]
+      log --> sel --> inject --> draft
+    end
+
+    classDef m fill:#FBF7EE,stroke:#E7DECE,color:#6E6457;
+        </pre>
+      </div>
+      <p class="diagram-cap">
+        An <code>approve</code> captures the accepted draft as <code>final_text</code> + the email context in
+        <code>meta</code>; an <code>edit</code> carries original+final so the cosmetic/substantive tagger runs.
+        Those become the <em>(email → good reply)</em> pairs few-shot learns from.
+      </p>
+
+      <div class="callout bean">
+        <span class="k">The recategorize signal</span>
+        <h4>A relabel is captured orthogonally — no new action, no schema change.</h4>
+        <p>
+          The draft view has a <strong>category dropdown</strong>. When the operator relabels the bucket, that is a
+          <em>classification</em> correction, independent of the draft <em>action</em> (they can relabel <em>and</em>
+          approve, edit, or take over). It is recorded as <code>category</code> (their final pick) vs
+          <code>meta.model_category</code> (the model's original) — any row where they differ <em>is</em> the
+          relabel signal. <code>meta</code> is the designed free-dict extension point, so this needs no enum and
+          no schema migration.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ UI <-> ENGINE BRIDGE ============ -->
+    <section>
+      <h2 id="bridge">The UI ↔ engine bridge</h2>
+      <p class="lede">
+        One stdlib server (<code>bean/server.py</code>) does two jobs so the admin fetches same-origin: it
+        persists config to a file and proxies preview requests to the engine.
+      </p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+    subgraph browser["Browser — web/"]
+      admin["Teach-Bean admin<br/>edit categories / templates / KB"]
+      inbox["Inbox + draft view<br/>3-bucket · approve/edit/recategorize"]
+    end
+
+    subgraph server["bean/server.py"]
+      api["BeanHandler<br/>GET/PUT /api/config<br/>POST /api/preview<br/>POST /api/correction<br/>static web/ files"]
+    end
+
+    store[("data/{customer}/ — on the volume<br/>config.json + corrections.jsonl<br/>BEAN_DATA_DIR → Railway mount")]
+    engine["triage() engine<br/>loop · routing · llm"]
+
+    admin -- "GET/PUT /api/config" --> api
+    inbox -- "POST /api/preview" --> api
+    inbox -- "POST /api/correction" --> api
+    api -- "read / write" --> store
+    store -- "Config + corrections (few-shot)" --> engine
+    api -- "Email (+ config override)" --> engine
+    engine -- "TriageResult JSON" --> api
+
+    note["localStorage now only holds email status (bean_status_v2)<br/>config + corrections persist server-side on the volume"]:::muted
+    inbox -.-> note
+
+    classDef muted fill:#FBF7EE,stroke:#E7DECE,stroke-width:1px,color:#6E6457,font-size:11px;
+        </pre>
+      </div>
+      <p class="diagram-cap">
+        Run with <code>python -m bean.server</code> → <code>http://127.0.0.1:8011/Bean.html</code>. Both config
+        <em>and</em> the correction log persist to <code>data/{customer}/</code> on the volume
+        (<code>bean/paths.py</code>, <code>BEAN_DATA_DIR</code> → the Railway mount in prod); only ephemeral
+        email status stays in <code>localStorage</code>.
+      </p>
+    </section>
+
+    <!-- ============ ONBOARDING / OPERATING MODEL ============ -->
+    <section>
+      <h2 id="onboarding">Onboarding &amp; operating model</h2>
+      <p class="lede">
+        Two reframes (2026-06-25) override the earlier "FDE + native-app + Proton Bridge" framing:
+        <strong>Bean is a product</strong> (self-serve onboarding that scales past customer #1 without Sameer in
+        the loop), and it <strong>never stores a raw mailbox credential</strong>. The credential constraint picks the
+        connection model — and is the better product anyway.
+      </p>
+
+      <div class="callout bean">
+        <span class="k">Connection model</span>
+        <h4>Forward + domain authentication (the helpdesk pattern) — primary. OAuth — secondary.</h4>
+        <p>
+          The customer forwards their <code>support@</code> mail to Bean and verifies their domain via DNS (an SPF
+          include + a DKIM key delegated to <em>their</em> domain + a custom Return-Path). Bean reads inbound and
+          sends replies <strong>as</strong> <code>support@theirbrand.com</code> through its own infra — with
+          <strong>zero credentials</strong>, and provider-agnostically (Gmail, Outlook, <em>and Proton</em>). This
+          is how Gorgias / Front / Help Scout onboard. <strong>OAuth (Gmail/Outlook)</strong> is the secondary
+          path: one-click, revocable token, invisible with no DNS — but it can't serve Proton.
+        </p>
+        <p class="guard">
+          <b>Why this dissolves the Proton problem:</b> the blocker was never "Proton has no API" — it was "we were
+          trying to log <em>in</em> as them." Stop logging in. Forward in, send out domain-authenticated. Works on
+          Proton as long as there's a custom domain — customer #1's is <code>hello@sableandwren.example</code>.
+        </p>
+      </div>
+
+      <div class="callout amber">
+        <span class="k">Value before friction</span>
+        <h4>The onboarding sequence is ordered so the operator sees Bean work <em>before</em> any DNS.</h4>
+        <p>
+          (1) enter address → (2) import ~20 recent emails → real drafts appear (no DNS, no forward rule, no
+          credentials yet) → (3) Bean bootstraps their voice from their sent replies (this replaces the questionnaire
+          <em>and</em> FDE pre-seeding) → (4) <strong>first approve = the success moment</strong> → (5) <em>then</em>
+          the one-time forward rule + DNS to go live. Replies then send invisibly as their brand. Full design in
+          <code>roadmap.md</code> § Onboarding.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ MODULE TABLE ============ -->
+    <section>
+      <h2 id="modules">Module responsibility table</h2>
+      <p class="lede">Each <code>bean/*.py</code> with its one job and key publics. The rep is <code>routing.py</code>.</p>
+      <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Module</th><th>One job</th><th>Key functions</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-mod"><code>contract.py</code></td>
+            <td>The harness ↔ UI data contract</td>
+            <td><code>Email</code>, <code>TriageResult</code>, <code>Confidence</code>; <code>__post_init__</code> validates invariants (FLAG has no draft; HIGH requires reasoning; LOW requires concerns)</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>config.py</code></td>
+            <td>Config-as-data spine</td>
+            <td><code>Category</code>, <code>Config</code>, <code>load_config()</code>, <code>from_fixtures()</code>, <code>from_dict()</code>, <code>to_dict()</code>, <code>prefix_args()</code></td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>fixtures.py</code></td>
+            <td>Default data + golden calibration set</td>
+            <td><code>CATEGORIES</code>, <code>TEMPLATES</code>, <code>KNOWLEDGE_DOCS</code>, <code>ORDERS</code>, <code>GOLDEN</code> (8 cases + <code>also_accepts</code>)</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>prompts.py</code></td>
+            <td>Stable cached prefix + tool schemas</td>
+            <td><code>build_system_prefix()</code>, <code>system_blocks()</code>, <code>classify_tool()</code>, <code>ASSESS_TOOL</code>, <code>classify_user()</code>, <code>assess_user()</code></td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>llm.py</code></td>
+            <td>Model interface and implementations</td>
+            <td><code>Model</code> (Protocol), <code>AnthropicModel</code>, <code>FakeModel</code>, <code>live_model()</code>; ids: classify=<code>claude-haiku-4-5</code>, draft=<code>claude-sonnet-4-6</code>, judge=<code>claude-opus-4-8</code></td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>routing.py</code></td>
+            <td><strong>The rep</strong> — decomposed confidence judgment; selects few-shot after classify</td>
+            <td><code>route()</code> (pure deterministic map), <code>classify()</code>, <code>assess()</code> (takes few-shot examples), <code>evaluate()</code> (takes <code>corrections</code>), <code>config_system_prefix()</code></td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>loop.py</code></td>
+            <td>Wires live models + sources around evaluate; default-loads the correction log</td>
+            <td><code>triage(email, …)</code> — the public entry point (loads few-shot from the per-customer log, zero-config)</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>sources.py</code></td>
+            <td>Grounding integrations (fixture-backed)</td>
+            <td><code>KnowledgeStore</code> (<code>.all()</code>, <code>.search()</code>), <code>OrderLookup</code> (<code>.facts_for()</code>, <code>.order_numbers()</code>), <code>EmailSource</code></td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>corrections.py</code></td>
+            <td>Correction log + edit classifier + few-shot selector (<strong>the learning loop</strong>)</td>
+            <td><code>classify_edit()</code>, <code>record()</code>, <code>load()</code>, <code>substantive_only()</code>, <code>few_shot_examples()</code> (same-category last-K voice exemplars)</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>paths.py</code></td>
+            <td>The data-layout source of truth (per-customer, on the volume)</td>
+            <td><code>config_path()</code>, <code>corrections_path()</code>; <code>BEAN_DATA_DIR</code> / <code>BEAN_CUSTOMER</code> overrides; the JSONL→SQLite migration trigger</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>server.py</code></td>
+            <td>HTTP backend (config + preview + correction capture + static)</td>
+            <td><code>serve()</code>, <code>BeanHandler</code> (GET/PUT <code>/api/config</code>, POST <code>/api/preview</code>, POST <code>/api/correction</code>)</td>
+          </tr>
+          <tr>
+            <td class="col-mod"><code>cli.py</code></td>
+            <td>Triage fixture inbox; emit <code>web/bean-data.jsx</code></td>
+            <td><code>render_terminal()</code>, <code>render_data_jsx()</code>, <code>build_config()</code></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <!-- ============ INVARIANTS ============ -->
+    <section>
+      <h2 id="invariants">The two load-bearing invariants</h2>
+      <p class="lede">Two things must hold or the system loses its edge: cache stability and calibrated trust.</p>
+
+      <div class="callout bean">
+        <span class="k">Invariant 1</span>
+        <h4>Byte-identical cached system prefix</h4>
+        <p>
+          <code>build_system_prefix()</code> runs once per triage and its output is shared as a single cached
+          content block across <em>both</em> model legs. The cache hit requires the bytes to be exactly the same
+          across calls — any whitespace drift, key-order change, or timestamp would bust the cache, double cost,
+          and shift the calibration anchors the model reasons against.
+        </p>
+        <p>
+          Mechanism: <code>_render_dict</code> renders <code>sorted(d)</code>; <code>KnowledgeStore.all()</code>
+          and <code>Config.to_dict()</code> sort their docs; no timestamps or UUIDs in the prefix. KB images ride
+          as separate <code>image</code> blocks, never inside the text prefix — so the prefix stays byte-identical
+          even when screenshots are present.
+        </p>
+        <p>
+          <strong>The learning loop respects this.</strong> Few-shot examples are per-email and per-customer, so
+          they ride in the <em>per-email</em> <code>assess_user()</code> message — <strong>never</strong> the
+          cached prefix. The empty-log path renders the exact pre-few-shot string, so an inbox with no corrections
+          yet is byte-identical to before the loop existed.
+        </p>
+        <p class="guard"><b>Guards:</b> <code>tests/test_config_snapshot.py::test_default_config_prefix_is_byte_identical</code> + <code>tests/test_fewshot.py</code> (asserts examples reach the user message but never the system block, and the empty-log regression). Never weaken them — if they fail, the cache is broken.</p>
+      </div>
+
+      <div class="callout amber">
+        <span class="k">Invariant 2</span>
+        <h4>Calibrated confidence routing</h4>
+        <p>
+          The golden set (<code>fixtures.GOLDEN</code>: 8 emails) defines the correct HIGH/LOW/FLAG label per
+          archetype; the calibration test runs live model calls and checks every result against its expected
+          label. <strong>HIGH must be sourced</strong> — the anti-fabrication gate requires a HIGH result to cite
+          its sources, or it is not allowed into the blind-trust bucket.
+        </p>
+        <p>
+          <code>mm-0998</code> is the boundary case: a Returns &amp; Exchanges email with a worn / used item.
+          Its confidence legitimately wavers <code>low</code> ↔ <code>flag</code> run-to-run (~40% flag, ~60%
+          low) because "is worn-item returnability grounded?" is genuinely ambiguous under the policy. It is
+          resolved with <code>also_accepts={Confidence.FLAG}</code> — deterministic suite without forcing a false
+          label. Every other golden stays strict. The waver is surfaced, not suppressed.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ CONFIG-AS-DATA ============ -->
+    <section>
+      <h2 id="config">The config-as-data spine</h2>
+      <p>
+        The operator's data (categories, templates, knowledge docs, settings) was previously hardcoded in
+        <code>bean/fixtures.py</code> constants. Phase 1 moved it into an injected <code>Config</code> dataclass
+        the routing engine is fed — so swapping in their real data is a <strong>file swap, not a code edit</strong>.
+        The engine reads whatever <code>Config</code> it receives; the fixtures remain only as the default fallback.
+      </p>
+
+      <h3>On-disk shape — <code>bean-config.json</code></h3>
+      <pre class="json"><code><span class="lit">{</span>
+  <span class="key">"categories"</span>: [
+    { <span class="key">"name"</span>: <span class="str">"Order Status"</span>, <span class="key">"description"</span>: <span class="str">"Where-is-my-order..."</span>,
+      <span class="key">"template"</span>: <span class="str">"Hi {name}, thanks for reaching out! ..."</span>, <span class="key">"alwaysEscalate"</span>: <span class="lit">false</span> },
+    { <span class="key">"name"</span>: <span class="str">"Wholesale"</span>, <span class="key">"description"</span>: <span class="str">"Bulk / B2B..."</span>,
+      <span class="key">"template"</span>: <span class="lit">null</span>, <span class="key">"alwaysEscalate"</span>: <span class="lit">true</span> }
+  ],
+  <span class="key">"knowledgeDocs"</span>: [
+    { <span class="key">"title"</span>: <span class="str">"returns-policy"</span>, <span class="key">"body"</span>: <span class="str">"..."</span>, <span class="key">"image"</span>: <span class="str">"/path/to/screenshot.png"</span> }
+  ],
+  <span class="key">"settings"</span>: { <span class="key">"shopifyStore"</span>: <span class="str">"sable-and-wren"</span> }
+<span class="lit">}</span></code></pre>
+
+      <div class="cols">
+        <div class="col-card">
+          <h4>Example vs gitignored</h4>
+          <ul>
+            <li><b><code>bean-config.example.json</code></b> — committed; the fixtures data as a reference shape.</li>
+            <li><b><code>bean-config.json</code></b> — gitignored; the operator's real (or edited) config, written by the server on every <code>PUT /api/config</code>.</li>
+          </ul>
+        </div>
+        <div class="col-card">
+          <h4>The FLAG rule, as data</h4>
+          <ul>
+            <li>A category with <code>template: null</code> <b>OR</b> <code>alwaysEscalate: true</code> always routes to FLAG (<code>Category.flags</code> property).</li>
+            <li>This is how Wholesale and Escalation work without a code change.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout amber">
+        <span class="k">Never-crash load</span>
+        <h4><code>load_config()</code> degrades to safe defaults</h4>
+        <p>
+          Missing file → fixtures default + warning. Malformed JSON → fixtures default + warning. Wrong shape →
+          fixtures default + warning. A bad edit degrades to safe defaults rather than taking the loop down —
+          <code>load_config()</code> never raises.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ SHIPPED VS PENDING ============ -->
+    <section>
+      <h2 id="boundaries">Shipped vs pending</h2>
+      <p class="lede">Live now (engine is fully config-driven end-to-end) vs what waits on the operator's real data.</p>
+
+      <div class="cols">
+        <div class="col-card shipped">
+          <h4><span class="pip"></span> Live now</h4>
+          <p class="meta">Through 2026-06-25</p>
+          <ul>
+            <li><b>Config-as-data</b> — engine is config-driven end to end; swapping in the operator's data is a file swap, not a code edit.</li>
+            <li><b>Server</b> — GET/PUT <code>/api/config</code> + POST <code>/api/preview</code> + POST <code>/api/correction</code> + static <code>web/</code>; persists to <code>data/{customer}/</code> on the volume.</li>
+            <li><b>The learning loop</b> — UI captures every action (approve/edit/take-over/snooze + <b>recategorize</b>) to the log; few-shot feeds same-category past replies back into the draft step. Provider-agnostic.</li>
+            <li><b>The General/IDK gate</b> — low classification-confidence routes to General (no draft, "which bucket is this?"), the cleanest learning signal.</li>
+            <li><b>Web UI</b> (3-bucket inbox, per-confidence draft view, "Teach Bean" admin), <b>vision wiring</b>, <b>threads</b>, <b>golden calibration</b> (8 cases + <code>also_accepts</code>).</li>
+          </ul>
+        </div>
+        <div class="col-card pending">
+          <h4><span class="pip"></span> Designed, not built</h4>
+          <p class="meta">Next phases</p>
+          <ul>
+            <li><b>Phase 4 — real-data calibration.</b> Swap placeholder categories/templates/docs for the operator's real ones → re-run the golden suite on real emails. Waits on their questionnaire.</li>
+            <li><b>Mail connection (onboarding).</b> <code>Source</code>/<code>EmlSource</code> ingest (zero auth — also the onboarding import) → then forward+domain-auth: DNS-record generation + verification polling, the domain-authenticated send path, and OAuth as the secondary provider. No mailbox credentials, ever.</li>
+            <li><b>Voice bootstrap</b> from their sent replies (auto-infer categories/tone/templates). <b>Shopify Admin API</b> (read-only) when deep-links aren't enough. <b>Vector retrieval</b> when the KB outgrows the in-prefix approach.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="north-star">
+        <b>North star — a self-serve product, not a per-customer setup.</b> A new customer connects their own
+        inbox (forward + domain-auth, no credentials), Bean bootstraps their voice from their sent mail, and the
+        correction log makes it irreplaceable over time. The thin triage → draft → approve wedge, with the
+        learning loop compounding, is what earns the right to widen.
+      </div>
+    </section>
+
+    <p class="footnote">
+      This page is the architecture source of truth (the old <code>ARCHITECTURE.md</code> is retired). The
+      <em>why</em> lives in <code>design-bean-loop.md</code>, the onboarding design in <code>roadmap.md</code>,
+      and the running context in <code>session-handoff.md</code> + the knowledge vault.
+    </p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    securityLevel: "loose",
+    flowchart: { curve: "basis", padding: 14, useMaxWidth: true },
+    themeVariables: {
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      fontSize: "14px",
+      primaryColor: "#FBF7EE",
+      primaryBorderColor: "#6E4327",
+      primaryTextColor: "#2C2620",
+      lineColor: "#9A8F7E",
+      secondaryColor: "#F4EEE1",
+      tertiaryColor: "#FFFDF8",
+      clusterBkg: "#FFFDF8",
+      clusterBorder: "#E7DECE",
+      edgeLabelBackground: "#FBF7EE"
+    }
+  });
+
+  // active-section highlighting in the TOC
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+    var map = {};
+    links.forEach(function (a) {
+      var id = a.getAttribute("href").slice(1);
+      var el = document.getElementById(id);
+      if (el) map[id] = a;
+    });
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          links.forEach(function (l) { l.classList.remove("active"); });
+          var a = map[e.target.id];
+          if (a) a.classList.add("active");
+        }
+      });
+    }, { rootMargin: "-10% 0px -75% 0px", threshold: 0 });
+    Object.keys(map).forEach(function (id) {
+      observer.observe(document.getElementById(id));
+    });
+  })();
+</script>
+</body>
+</html>

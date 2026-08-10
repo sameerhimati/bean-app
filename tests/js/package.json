@@ -1,0 +1,11 @@
+{
+  "name": "bean",
+  "private": true,
+  "description": "Dev-only, and deliberately NOT at the repo root: a root package.json makes Railway's nixpacks builder detect a Node project and build an image without Python. jsdom exists solely so the pytest suite can run web/*.jsx browser code (DOMParser, localStorage) under a DOM. Nothing here ships. Install with: npm install --prefix tests/js",
+  "scripts": {
+    "test": "python3 -m pytest tests/test_paste_links.py tests/test_correction_outbox.py -q"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
+}

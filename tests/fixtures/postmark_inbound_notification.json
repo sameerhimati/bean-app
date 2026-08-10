@@ -1,0 +1,39 @@
+{
+  "FromName": "Sable & Wren",
+  "MessageStream": "inbound",
+  "From": "orders@shopify.com",
+  "FromFull": {
+    "Email": "orders@shopify.com",
+    "Name": "Sable & Wren",
+    "MailboxHash": ""
+  },
+  "To": "\"Sable & Wren Support\" <hello+sablewren@inbound.postmarkapp.com>",
+  "ToFull": [
+    {
+      "Email": "hello+sablewren@inbound.postmarkapp.com",
+      "Name": "Sable & Wren Support",
+      "MailboxHash": "sablewren"
+    }
+  ],
+  "Cc": "",
+  "CcFull": [],
+  "Bcc": "",
+  "BccFull": [],
+  "OriginalRecipient": "hello@sableandwren.example",
+  "Subject": "A shipment from order #SW-10482 is on the way",
+  "MessageID": "notif-a1b2c3d4-5566-7788-99aa-bbccddeeff00",
+  "ReplyTo": "",
+  "MailboxHash": "sablewren",
+  "Date": "Wed, 8 Jul 2026 09:02:11 -0400",
+  "TextBody": "Your order is on the way.\n\nCustomer: Jordan Ramirez <jordan.ramirez@example.com>\nShipped on: 2026-07-08\nCarrier: USPS\nTracking number: 9400111899220000111122 https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111899220000111122\n\nItems:\n1 × Aspen Extension Dining Table\n",
+  "HtmlBody": "",
+  "StrippedTextReply": "",
+  "Tag": "",
+  "Headers": [
+    {
+      "Name": "Return-Path",
+      "Value": "<orders@shopify.com>"
+    }
+  ],
+  "Attachments": []
+}

@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# The server reads PORT and binds 0.0.0.0 on its own (see bean/server.py __main__), so no flags.
+startCommand = "python -m bean.server"
+restartPolicyType = "on_failure"

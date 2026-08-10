@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bean — inbox triage</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Bean — inbox triage" />
+<meta property="og:description" content="Bean reads your support mail and drafts replies for you to approve. You stay in control — Bean never sends." />
+<!-- Relative, and no og:url: this file is plain HTML with no server templating, so it cannot know
+     the origin it is being served from. It used to hardcode one deployment's hostname, which meant
+     every fork advertised — and pulled its preview image from — an instance it does not own. The
+     server-rendered copy of these tags (bean/server.py _BRAND_HEAD) upgrades og:image to absolute
+     and adds og:url when BEAN_PUBLIC_URL is set; keep the two in sync. -->
+<meta property="og:image" content="/og-bean.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #F4EEE1;
+    --cream-2: #FBF7EE;
+    --paper: #FFFDF8;
+    --ink: #2C2620;
+    --ink-soft: #6E6457;
+    --ink-faint: #9A8F7E;
+    --line: #E7DECE;
+    --line-soft: #EFE8DA;
+    --bean: #6E4327;
+    --shadow: 0 1px 2px rgba(58,48,32,.04), 0 6px 18px rgba(58,48,32,.06);
+    --shadow-lg: 0 2px 4px rgba(58,48,32,.05), 0 14px 40px rgba(58,48,32,.10);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .wordmark, .bean-says-title, .why-label, .greet-text h1 { font-family: 'Courier Prime', 'Courier New', monospace; }
+  button { font-family: inherit; }
+  ::selection { background: #e7d9c2; }
+
+  .pixel-bean { image-rendering: pixelated; flex: none; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  .bean-bob { animation: bob 2.6s ease-in-out infinite; }
+
+  /* ---------- Shell ---------- */
+  .app-shell { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0 14px; margin-bottom: 8px;
+    background: linear-gradient(var(--cream) 70%, rgba(244,238,225,0));
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .wordmark { font-size: 25px; font-weight: 700; letter-spacing: -.5px; line-height: 1; color: var(--ink); }
+  .tagline { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--bean); margin-top: 4px; letter-spacing: 3px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .proton-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
+    background: var(--paper); border: 1.5px solid var(--line);
+    padding: 6px 12px; border-radius: 999px;
+  }
+  .proton-dot { width: 8px; height: 8px; border-radius: 999px; background: #E0A92E; box-shadow: 0 0 0 3px #FBF1DA; }
+  .proton-pill.is-live .proton-dot { background: #4CA35A; box-shadow: 0 0 0 3px #EAF6EC; }
+
+  /* ---------- Inbox greeting ---------- */
+  .greet-card {
+    display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center;
+    background: var(--paper); border: 1.5px solid var(--line);
+    border-radius: 20px; padding: 22px 24px; margin-bottom: 26px;
+    box-shadow: var(--shadow);
+    position: relative; overflow: hidden;
+  }
+  .greet-card::after {
+    content: ''; position: absolute; right: -40px; top: -40px; width: 160px; height: 160px;
+    background: radial-gradient(circle, #efe6d6 0%, transparent 70%); pointer-events: none;
+  }
+  .greet-bean { margin: 2px; }
+  .greet-text h1 { margin: 0 0 6px; font-size: 23px; font-weight: 600; }
+  .greet-text p { margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 60ch; }
+  .greet-text b { color: var(--ink); }
+  .greet-action { grid-column: 1 / -1; }
+
+  /* ---------- Inbox groups ---------- */
+  .inbox-group { margin-bottom: 26px; }
+  .group-head { display: flex; align-items: center; gap: 9px; margin: 0 4px 11px; flex-wrap: wrap; }
+  .group-dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .group-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .group-blurb { font-size: 13px; color: var(--ink-faint); font-weight: 600; }
+  .group-count {
+    margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--ink-soft);
+    background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 999px;
+    min-width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; padding: 0 7px;
+  }
+  .group-rows { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ---------- Inbox filter bar ---------- */
+  /* A lens above the list, in the same paper/cream language as the rows it filters. */
+  .inbox-filter {
+    display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap;
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 11px 15px; margin-bottom: 22px; box-shadow: var(--shadow);
+  }
+  .inbox-filter-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .inbox-filter-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); margin-right: 2px; }
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-family: inherit;
+    font-size: 12px; font-weight: 700; color: var(--ink-soft);
+    background: var(--cream-2); border: 1.5px solid var(--line);
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; transition: all .12s;
+  }
+  .filter-pill:hover { border-color: var(--bean); color: var(--ink); }
+  .filter-pill.is-on { color: var(--bean); background: #f1e7d6; border-color: #e4d3b4; }
+  .filter-pill .fp-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+  /* Label dropdown — a native select restyled to read as Bean (the browser default clashed with the
+     pills next to it). appearance:none strips the OS chrome; the wrapper draws our own chevron. */
+  .category-select-wrap { position: relative; display: inline-flex; }
+  .category-select-wrap::after {
+    content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 10px; color: var(--ink-faint); pointer-events: none;
+  }
+  .category-select {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft);
+    background: var(--cream-2); border: 1.5px solid var(--line);
+    padding: 5px 26px 5px 11px; border-radius: 999px; cursor: pointer; transition: all .12s;
+    max-width: 220px; text-overflow: ellipsis;
+  }
+  .category-select:hover { border-color: var(--bean); color: var(--ink); }
+  .category-select:focus { outline: none; border-color: var(--bean); }
+  /* Clear-FYI: a quiet destructive action — legible, not loud, and it lives on the filed lane only. */
+  .filed-head { display: flex; align-items: center; gap: 12px; }
+  .clear-fyi {
+    font-family: inherit; font-size: 11px; font-weight: 800; letter-spacing: .3px;
+    color: var(--ink-faint); background: none; border: 1.5px solid var(--line);
+    padding: 4px 11px; border-radius: 999px; cursor: pointer; transition: all .12s; flex: none;
+  }
+  .clear-fyi:hover { color: #B4472E; border-color: #E4C3B4; background: #FBEFE9; }
+  .inbox-filter-count { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; color: var(--ink-faint); }
+  .inbox-filter-clear { font-family: inherit; font-size: 12px; font-weight: 800; color: var(--bean); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+  .inbox-filter-clear:hover { color: var(--ink); }
+  .inbox-empty-filter {
+    font-size: 13px; color: var(--ink-soft); background: var(--cream-2);
+    border: 1.5px dashed var(--line); border-radius: 14px; padding: 20px; text-align: center; margin-bottom: 22px;
+  }
+
+  .inbox-row {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;
+    width: 100%; text-align: left; background: var(--paper);
+    border: 1.5px solid var(--line); border-left-width: 4px;
+    border-radius: 14px; padding: 14px 16px; cursor: pointer;
+    transition: transform .1s ease, box-shadow .15s ease, border-color .15s ease;
+    box-shadow: var(--shadow); font-family: inherit;
+  }
+  .inbox-row:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .inbox-row.is-done { opacity: .58; box-shadow: none; }
+  .row-avatar {
+    width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; flex: none;
+  }
+  .row-main { min-width: 0; }
+  .row-line1 { display: flex; align-items: center; gap: 9px; margin-bottom: 3px; overflow: hidden; }
+  .row-from { font-weight: 700; font-size: 14px; white-space: nowrap; flex: none; }
+  .cat-tag {
+    font-size: 11px; font-weight: 700; color: var(--ink-soft);
+    background: var(--cream-2); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 6px; white-space: nowrap;
+  }
+  .row-subject { font-weight: 700; font-size: 14.5px; color: var(--ink); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-snippet { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+  .row-time { font-size: 11.5px; color: var(--ink-faint); font-weight: 700; }
+  .row-status { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+  .row-status.approved, .row-status.handled { color: #2E7D3E; background: #EAF6EC; }
+  .row-status.skipped { color: #9A6A12; background: #FBF1DA; }
+  .done-group { margin-top: 8px; }
+  .done-group .inbox-row { background: var(--cream-2); }
+
+  /* ---------- Draft view ---------- */
+  .draft-view { animation: fadeUp .25s ease; }
+  @keyframes fadeUp { from { transform: translateY(8px); } to { transform: none; } }
+  .back-btn {
+    background: var(--paper); border: 1.5px solid var(--line); color: var(--ink-soft);
+    font-size: 13.5px; font-weight: 800; padding: 8px 14px; border-radius: 999px; cursor: pointer; margin-bottom: 16px;
+  }
+  .back-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+  .draft-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 18px; align-items: start; }
+  /* A grid item's min-width is `auto`, so it refuses to shrink below its longest unbreakable word.
+     Real mail is full of them — a 200-char tracking URL in a marketing email widened this column
+     past its 1fr, overflowed the grid, and shoved BOTH panes off-screen (the body clipped at the
+     left edge). Same fix as .row-main above: let the column shrink, and let the words break. */
+  .draft-grid > * { min-width: 0; }
+
+  .email-panel {
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
+    position: sticky; top: 84px;
+  }
+  .email-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .email-avatar { width: 44px; height: 44px; border-radius: 12px; background: #ece6f7; color: #6d4aff; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
+  .email-from { font-weight: 800; font-size: 15px; }
+  .email-addr { font-size: 12.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; }
+  .email-time { margin-left: auto; font-size: 12px; color: var(--ink-faint); font-weight: 700; flex: none; }
+  .email-subject { font-weight: 700; font-size: 18px; line-height: 1.3; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1.5px dashed var(--line); overflow-wrap: anywhere; }
+  .email-body p { margin: 0 0 12px; color: #4a4338; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+  .email-body p:last-child { margin-bottom: 0; }
+  /* Linkified tracking URLs are one enormous "word". Break them rather than let them decide the
+     page width. `anywhere` (not break-all) so ordinary prose still wraps on spaces. */
+  .email-body a { overflow-wrap: anywhere; }
+
+  .bean-panel { display: flex; flex-direction: column; gap: 16px; }
+  .category-picker { display: flex; align-items: center; gap: 10px; }
+  .category-picker-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); }
+  .category-select { font: inherit; font-size: 13.5px; color: var(--ink-soft); background: var(--paper); border: 1.5px solid var(--line); border-radius: 9px; padding: 6px 10px; cursor: pointer; }
+  .category-select:focus { outline: none; border-color: var(--bean); }
+  .bean-says { display: flex; gap: 14px; align-items: flex-start; border: 1.5px solid; border-radius: 16px; padding: 16px 18px; }
+  .bean-says-title { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .bean-says-body { font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+
+  .why-block, .concern-block, .flag-reason { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; padding: 15px 17px; }
+  .why-block.subtle { background: var(--cream-2); }
+  .why-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); margin-bottom: 10px; }
+  .reason-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .reason-list li { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.45; color: #4a4338; }
+  .reason-mark { font-weight: 900; flex: none; }
+  .reason-high .reason-mark { color: #2E7D3E; }
+  .reason-low .reason-mark { color: #E0A92E; }
+  .reason-neutral .reason-mark { color: var(--ink-faint); }
+  .concern-block { background: #FCF6E8; border-color: #EAD6A2; }
+  .flag-reason { background: #FCEDE7; border-color: #F1C3B4; }
+  .flag-reason p { margin: 0; font-size: 14px; line-height: 1.55; color: #6a4034; }
+  .template-chip { display: inline-flex; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--bean); background: #F1E7D6; border: 1px solid #E2D0B6; padding: 4px 11px; border-radius: 8px; letter-spacing: .3px; }
+
+  .draft-box { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .draft-box-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: var(--cream-2); border-bottom: 1.5px solid var(--line); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); }
+  .draft-edit-btn { background: none; border: none; color: var(--bean); font-weight: 800; font-size: 12.5px; cursor: pointer; }
+  /* The ONE place Bean drops its own typeface. Everything else on this page is Courier Prime
+     because that is Bean's face — but this box is not Bean talking, it is the email the operator is
+     about to send, and it has to look like their mail rather than like ours. It is also the fix for
+     a real daily tax: selecting this text and hitting Cmd+C copies the RENDERED css, so a
+     typewriter font rode into Proton's composer on every reply and had to be reformatted by hand.
+     Kept in sync with COPY_STYLE in bean-ui.jsx, which puts the same font on the Copy button's
+     html clipboard flavor — the two copy paths must not disagree. */
+  /* This block wears Bean's own typeface again, and that is now a free choice rather than a risk.
+     It used to be forced to sans-serif because a hand-selected Cmd+C copies the RENDERED css, so the
+     page's Courier rode into the composer on every reply and got reformatted by hand. Both copy
+     paths now AUTHOR the clipboard instead of inheriting it — CopyButton builds its own html, and
+     `draftCopyHandler` (bean-draft.jsx) intercepts manual copies — so what lands in the email is
+     sans-serif 14pt regardless of what the screen shows. Display and clipboard are decoupled; if you
+     ever remove that handler, this rule has to go back to sans-serif with it.
+     Still framed as a preview pane: a white sheet inset in the cream card, a hairline, a soft
+     shadow — so it reads as the email sitting inside Bean rather than as loose text. */
+  .draft-text { margin: 14px; padding: 18px 20px; background: #FFFFFF; border: 1px solid var(--line-soft); border-radius: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(58,48,32,.06); font-size: 15px; line-height: 1.7; color: #3a342c; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  .bean-note { font-size: 13px; line-height: 1.5; color: #6a5a30; background: #FBF1DA; border: 1.5px dashed #E0A92E; border-radius: 12px; padding: 12px 15px; }
+  .bean-note b { color: #7a5410; }
+
+  .no-draft { display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); background: repeating-linear-gradient(135deg, #f6f1e6, #f6f1e6 9px, #f1ebde 9px, #f1ebde 18px); border: 1.5px dashed var(--line); border-radius: 14px; padding: 16px 18px; }
+
+  .edit-pane { display: flex; flex-direction: column; gap: 14px; }
+  .edit-area { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; font-family: inherit; font-size: 13.5px; line-height: 1.65; color: var(--ink); background: var(--paper); resize: vertical; }
+  .edit-area:focus { outline: none; border-color: var(--bean); box-shadow: 0 0 0 3px #e7d9c2; }
+
+  .action-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+  .bean-btn:hover:not([disabled]) { transform: translateY(-1px); }
+  .bean-btn:active:not([disabled]) { transform: translateY(1px); box-shadow: none !important; }
+
+  .conf-badge { font-family: inherit; letter-spacing: 0; }
+
+  /* ---------- Toast ---------- */
+  .bean-toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 30px);
+    display: flex; align-items: center; gap: 12px;
+    background: var(--ink); color: #fff8ee; font-weight: 700; font-size: 14.5px;
+    padding: 12px 18px 12px 14px; border-radius: 14px; box-shadow: var(--shadow-lg);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s cubic-bezier(.2,.9,.3,1.2); z-index: 60;
+    max-width: 90vw;
+  }
+  .bean-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* A failed write must not look like a saved one. Amber rail — the same warning colour the low-
+     confidence draft state uses, so "Bean isn't sure" and "Bean couldn't save" read as one family. */
+  .bean-toast.is-warn { border-left: 4px solid #E8A87C; padding-left: 14px; }
+
+  /* ---------- Thread history + Shopify links (draft view) ---------- */
+  .shopify-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .shopify-link {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
+    color: #4257d6; background: #eef0fd; border: 1px solid #d7dcfa;
+    padding: 4px 10px; border-radius: 8px; text-decoration: none; white-space: nowrap;
+  }
+  .shopify-link:hover { background: #e2e6fb; border-color: #c2c9f5; }
+  .thread-history { background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px 15px; margin-bottom: 14px; }
+  .thread-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); margin-bottom: 10px; }
+  .thread-msg { border-left: 3px solid var(--line); padding: 0 0 0 11px; margin-bottom: 10px; }
+  .thread-msg p { margin: 0 0 5px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+  .thread-msg p:last-child { margin-bottom: 0; }
+  .thread-current { font-size: 11px; font-weight: 800; color: var(--bean); letter-spacing: .4px; }
+  .thread-pill { font-size: 10.5px; font-weight: 800; color: var(--bean); background: #f1e7d6; border: 1px solid #e2d0b6; padding: 1px 7px; border-radius: 999px; white-space: nowrap; letter-spacing: .2px; }
+
+  /* ---------- Teach-Bean entry ---------- */
+  .teach-btn {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800;
+    color: var(--bean); background: var(--paper); border: 1.5px solid var(--line);
+    padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
+  }
+  .teach-btn:hover { border-color: var(--bean); }
+
+  /* ---------- Admin surface ---------- */
+  .admin-view { animation: fadeUp .25s ease; }
+  .admin-shell { display: grid; grid-template-columns: 210px 1fr; gap: 20px; align-items: start; }
+  .admin-nav {
+    position: sticky; top: 84px; display: flex; flex-direction: column; gap: 3px;
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 16px; padding: 12px; box-shadow: var(--shadow);
+  }
+  .admin-nav-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-faint); padding: 6px 10px 8px; }
+  .admin-nav-btn { text-align: left; background: none; border: none; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); padding: 9px 11px; border-radius: 10px; cursor: pointer; }
+  .admin-nav-btn:hover { background: var(--cream-2); color: var(--ink); }
+  .admin-nav-btn.is-active { background: #f1e7d6; color: var(--bean); }
+  .admin-body { min-width: 0; }
+  .admin-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .admin-section-head h2 { margin: 0 0 3px; font-size: 19px; font-weight: 700; }
+  .admin-section-head p { margin: 0; font-size: 13.5px; color: var(--ink-soft); max-width: 56ch; }
+  .admin-add-btn { background: var(--bean); color: #fff8ee; border: none; font-family: inherit; font-weight: 800; font-size: 13px; padding: 9px 15px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+  .admin-add-btn:hover { filter: brightness(1.08); }
+  .admin-card { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; margin-bottom: 11px; box-shadow: var(--shadow); overflow: hidden; }
+  .admin-card-head { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: none; border: none; font-family: inherit; padding: 15px 17px; cursor: pointer; }
+  .admin-card-title { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .admin-card-chev { margin-left: auto; color: var(--ink-faint); font-size: 13px; }
+  .template-badge, .escalate-badge { font-size: 10.5px; font-weight: 800; padding: 2px 9px; border-radius: 999px; letter-spacing: .2px; }
+  .template-badge { color: #2E7D3E; background: #EAF6EC; border: 1px solid #BFE3C6; }
+  .escalate-badge { color: #B5462E; background: #FBE7E0; border: 1px solid #F1C3B4; }
+  .admin-card-body { padding: 4px 17px 17px; border-top: 1.5px solid var(--line-soft); }
+  .admin-card-body.open { border-top: none; padding-top: 15px; }
+  .admin-field { margin-top: 14px; }
+  .admin-field:first-child { margin-top: 0; }
+  .admin-label { font-size: 12.5px; font-weight: 800; color: var(--ink); margin-bottom: 5px; }
+  .admin-hint { font-size: 12px; color: var(--ink-faint); margin-bottom: 7px; line-height: 1.45; }
+  .admin-input, .admin-textarea { width: 100%; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 13.5px; line-height: 1.55; color: var(--ink); background: var(--cream-2); resize: vertical; }
+  .admin-input:focus, .admin-textarea:focus { outline: none; border-color: var(--bean); background: var(--paper); box-shadow: 0 0 0 3px #e7d9c2; }
+  .admin-note { margin-top: 12px; font-size: 12.5px; color: var(--ink-soft); background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .gap-warn { margin-top: 12px; font-size: 12.5px; font-weight: 700; color: #9A6A12; background: #FBF1DA; border: 1.5px solid #EAD6A2; border-radius: 10px; padding: 10px 12px; line-height: 1.5; }
+  .admin-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .admin-usage { font-size: 12px; font-weight: 700; color: var(--ink-faint); }
+  .admin-del { background: none; border: none; color: #B5462E; font-family: inherit; font-weight: 800; font-size: 12.5px; cursor: pointer; }
+  .admin-del:hover { text-decoration: underline; }
+  .toggle { display: inline-flex; align-items: center; gap: 10px; background: none; border: none; font-family: inherit; cursor: pointer; padding: 0; }
+  .toggle-knob { width: 38px; height: 22px; border-radius: 999px; background: #d8cdb8; position: relative; transition: background .15s; flex: none; }
+  .toggle-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+  .toggle.is-on .toggle-knob { background: var(--bean); }
+  .toggle.is-on .toggle-knob::after { transform: translateX(16px); }
+  .toggle-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .url-preview { margin-top: 10px; font-size: 12.5px; color: var(--ink-soft); word-break: break-all; line-height: 1.5; }
+  .url-preview a { color: #4257d6; }
+  .atom-group { margin-bottom: 18px; }
+  .atom-group-head { font-size: 12px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 8px 3px; }
+  .feedback-bar { margin-top: 16px; padding-top: 14px; border-top: 1.5px dashed var(--line-soft); display: flex; flex-direction: column; gap: 9px; }
+  .feedback-like { align-self: flex-start; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 999px; font-family: inherit; font-weight: 800; font-size: 12.5px; color: var(--ink-soft); padding: 6px 14px; cursor: pointer; transition: all .15s; }
+  .feedback-like:hover { border-color: var(--bean); color: var(--ink); }
+  .feedback-like.is-on { background: #EAF6EC; border-color: #BFE3C6; color: #2E7D3E; }
+  .feedback-comment { width: 100%; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--cream-2); resize: vertical; }
+  .feedback-comment:focus { outline: none; border-color: var(--bean); background: var(--paper); box-shadow: 0 0 0 3px #e7d9c2; }
+  .gap-teach-btn { margin-top: 12px; width: 100%; background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 11px; font-family: inherit; font-weight: 800; font-size: 13px; color: var(--ink-soft); padding: 11px 14px; cursor: pointer; transition: all .15s; }
+  .gap-teach-btn:hover { border-color: var(--bean); color: var(--bean); }
+  .gap-capture { margin-top: 12px; padding: 14px; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .gap-saved { margin-top: 12px; font-size: 12.5px; font-weight: 700; color: #2E7D3E; background: #EAF6EC; border: 1.5px solid #BFE3C6; border-radius: 10px; padding: 11px 13px; line-height: 1.5; }
+
+  /* ---------- Routing-tree Miller editor ---------- */
+  /* Finder-style drill: one column per depth, a leaf editor as the last panel. Reads like the
+     runtime routed path (A › B › C) because it IS the same tree, same confidence palette. */
+  .tree-bc { font-size: 12px; color: var(--ink-soft); margin-bottom: 13px; min-height: 16px; }
+  .tree-bc b { color: var(--bean); }
+  .tree-cols { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
+  .tree-col { flex: none; width: 190px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--cream-2); overflow: hidden; box-shadow: var(--shadow); }
+  .tree-col-h { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-faint); padding: 9px 12px; border-bottom: 1px solid var(--line-soft); }
+  .tree-row { display: flex; align-items: center; gap: 8px; padding: 9px 11px; cursor: pointer; border-bottom: 1px solid var(--line-soft); }
+  .tree-row:last-of-type { border-bottom: none; }
+  .tree-row:hover { background: var(--paper); }
+  .tree-row.is-sel { background: var(--paper); box-shadow: inset 3px 0 0 var(--bean); }
+  .tree-row .tree-lbl { flex: 1; font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-row .tree-chev { color: var(--ink-faint); font-size: 13px; flex: none; }
+  .tree-dot { width: 9px; height: 9px; border-radius: 999px; flex: none; box-sizing: border-box; }
+  .tree-del { opacity: 0; color: #B5462E; font-weight: 800; cursor: pointer; padding: 0 2px; font-size: 12px; background: none; border: none; font-family: inherit; line-height: 1; flex: none; }
+  .tree-row:hover .tree-del { opacity: .55; }
+  .tree-del:hover { opacity: 1; }
+  .tree-col-add { display: block; width: 100%; text-align: left; font-family: inherit; font-size: 12px; font-weight: 800; color: var(--bean); background: transparent; border: none; border-top: 1px dashed var(--line); padding: 9px 12px; cursor: pointer; }
+  .tree-col-add:hover { background: var(--paper); }
+  .tree-leaf { width: 252px; flex: none; align-self: flex-start; border: 1.5px solid var(--bean); border-radius: 12px; background: var(--paper); padding: 14px; box-shadow: var(--shadow); }
+  .tree-leaf-h { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; }
+  .tree-leaf-h .tree-lbl { font-weight: 800; font-size: 14px; flex: 1; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-typetag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex: none; }
+  .tree-fld { margin-bottom: 11px; }
+  .tree-fld:last-child { margin-bottom: 0; }
+  .tree-fld label { display: block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-faint); margin-bottom: 5px; }
+  .tree-ed { font-family: inherit; font-size: 13px; width: 100%; border: 1.5px solid var(--line); border-radius: 9px; padding: 8px 10px; background: var(--cream-2); color: var(--ink); resize: vertical; line-height: 1.5; box-sizing: border-box; }
+  .tree-ed:focus { outline: none; border-color: var(--bean); background: var(--paper); box-shadow: 0 0 0 3px #e7d9c2; }
+  .tree-leaf-actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .tree-btn-move { flex: 1; font-family: inherit; font-size: 12px; font-weight: 800; color: var(--bean); background: var(--paper); border: 1.5px solid var(--bean); border-radius: 9px; padding: 7px 12px; cursor: pointer; }
+  .tree-btn-move:hover { background: var(--bean); color: #fff8ee; }
+  .tree-btn-del { flex: none; font-family: inherit; font-size: 12px; font-weight: 800; color: #B5462E; background: #FBE7E0; border: 1.5px solid #F1C3B4; border-radius: 9px; padding: 7px 12px; cursor: pointer; }
+  .tree-btn-del:hover { background: #B5462E; color: #fff; }
+  /* point-at-destination move */
+  .tree-move-banner { display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 700; color: #9A6A12; background: #FBF1DA; border: 1.5px solid #EAD6A2; border-radius: 11px; padding: 10px 13px; margin-bottom: 13px; }
+  .tree-move-banner .tree-x { margin-left: auto; color: var(--ink-soft); cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 3px 11px; font-weight: 800; background: var(--paper); font-family: inherit; font-size: 12px; flex: none; }
+  .tree-move-banner .tree-x:hover { background: var(--cream); }
+  .tree-row.is-target { cursor: copy; outline: 2px dashed #E0A92E; outline-offset: -2px; border-radius: 8px; }
+  .tree-row.is-target:hover { background: #FBF1DA; }
+  .tree-col-add.is-target { color: #9A6A12; border-top-color: #EAD6A2; }
+  .tree-col-add.is-target:hover { background: #FBF1DA; }
+  .tree-row.is-dim { opacity: .32; pointer-events: none; }
+  /* Tree ⇄ Flat-list lens: same nodes, different projection — NOT a second editing surface. */
+  .tree-toggle { display: inline-flex; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; flex: none; }
+  .tree-toggle button { font-family: inherit; font-size: 12.5px; font-weight: 800; color: var(--ink-soft); background: none; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; }
+  .tree-toggle button:hover { color: var(--ink); }
+  .tree-toggle button.is-on { background: var(--paper); color: var(--bean); box-shadow: var(--shadow); }
+  .tree-flat { display: flex; flex-direction: column; gap: 9px; }
+  .tree-flat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 15px; cursor: pointer; font-family: inherit; box-shadow: var(--shadow); transition: transform .12s, border-color .12s; }
+  .tree-flat-row:hover { border-color: var(--bean); transform: translateY(-1px); }
+  .tree-flat-main { flex: 1; min-width: 0; }
+  .tree-flat-path { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tree-flat-seg { font-size: 12.5px; color: var(--ink-soft); font-weight: 700; }
+  .tree-flat-seg.is-leaf { color: var(--ink); font-weight: 800; }
+  .tree-flat-sep { color: var(--ink-faint); font-size: 11px; }
+  .tree-flat-preview { font-size: 12px; color: var(--ink-faint); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }
+  .tree-flat-empty { font-size: 12.5px; color: var(--ink-soft); background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 10px; padding: 12px 14px; line-height: 1.5; }
+
+  /* ---------- Outline tree editor ---------- */
+  .ol-toggle { display: inline-flex; border: 1.5px solid var(--line); border-radius: 10px; background: var(--cream-2); padding: 3px; }
+  .ol-toggle button { font-family: inherit; font-size: 12.5px; border: 0; background: none; color: var(--ink-soft); padding: 6px 13px; border-radius: 7px; cursor: pointer; font-weight: 700; }
+  .ol-toggle button.is-on { background: var(--paper); color: var(--ink); box-shadow: var(--shadow); }
+  .ol-cov { display: flex; gap: 9px; flex-wrap: wrap; margin: 0 0 16px; }
+  .ol-cov-card { flex: 1 1 120px; min-width: 108px; border: 1.5px solid var(--line); border-radius: 11px; background: var(--cream-2); padding: 10px 13px; }
+  .ol-cov-card.hl { background: #f1e7d6; border-color: #e4d3b4; }
+  .ol-cov-n { font-size: 20px; font-weight: 800; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+  .ol-cov-card.hl .ol-cov-n { color: var(--bean); }
+  .ol-cov-k { font-size: 11px; color: var(--ink-soft); margin-top: 1px; }
+  .ol-wrap { border: 1.5px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; box-shadow: var(--shadow); }
+  .ol-row { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line-soft, #efe8da); }
+  .ol-row:last-child { border-bottom: 0; }
+  .ol-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0; font-family: inherit; text-align: left; padding: 11px 8px; cursor: pointer; }
+  .ol-main:hover { background: var(--cream-2); }
+  .ol-row.is-catch .ol-main { background: #fbf5ec; }
+  .ol-chev { width: 13px; flex: none; color: var(--ink-faint); font-size: 11px; text-align: center; }
+  .ol-name { font-size: 13.5px; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ol-lock { font-size: 11px; flex: none; opacity: .7; }
+  .ol-meta { flex: none; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+  .ol-acts { display: flex; gap: 5px; padding-right: 12px; flex: none; }
+  .ol-acts button { width: 28px; height: 28px; border-radius: 8px; cursor: pointer; font-size: 13px; line-height: 1; background: var(--cream-2); }
+  .ol-add { border: 1px dashed #d8c6a0; color: var(--bean); }
+  .ol-edit { border: 1.5px solid var(--line); color: var(--ink-soft); }
+  .ol-acts button:hover { background: #f1e7d6; }
+  .ol-map { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line-soft, #efe8da); font-family: inherit; font-size: 12px; color: var(--ink-soft); line-height: 1.5; padding: 8px 12px 10px; cursor: pointer; }
+  .ol-map:hover { background: var(--cream-2); }
+  .ol-map-lab { font-weight: 800; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .3px; font-size: 10px; }
+  .ol-map-empty { color: var(--bean); font-weight: 700; }
+  .ol-addtop { display: block; width: 100%; text-align: left; margin-top: 10px; background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px 15px; font-family: inherit; font-size: 13px; font-weight: 700; color: var(--bean); cursor: pointer; }
+  .ol-addtop:hover { background: #f1e7d6; border-color: #e4d3b4; }
+  .ol-empty { font-size: 12.5px; color: var(--ink-soft); background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 12px; padding: 20px; line-height: 1.5; text-align: center; }
+  .ol-flat { display: flex; flex-direction: column; gap: 9px; }
+  .ol-flat-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 15px; cursor: pointer; font-family: inherit; box-shadow: var(--shadow); transition: transform .12s, border-color .12s; }
+  .ol-flat-row:hover { border-color: var(--bean); transform: translateY(-1px); }
+  .ol-flat-main { flex: 1; min-width: 0; }
+  .ol-flat-trail { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ol-flat-seg { font-size: 12.5px; color: var(--ink-soft); font-weight: 700; }
+  .ol-flat-seg::after { content: '›'; margin-left: 6px; color: var(--ink-faint); font-weight: 400; }
+  .ol-flat-seg:last-child::after { content: ''; }
+  .ol-flat-seg.is-leaf { color: var(--ink); font-weight: 800; }
+  .ol-flat-prev { font-size: 12px; color: var(--ink-faint); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Edit sheet + move modal ---------- */
+  .es-scrim { position: fixed; inset: 0; background: rgba(44, 32, 16, .42); display: flex; align-items: flex-end; justify-content: center; z-index: 60; }
+  .es-sheet { width: 640px; max-width: 100%; max-height: 94vh; overflow: auto; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 20px 20px 0 0; box-shadow: 0 30px 80px -28px rgba(58, 40, 20, .55); }
+  .es-head { display: flex; align-items: center; gap: 11px; padding: 18px 22px; border-bottom: 1px solid var(--line-soft, #efe8da); position: sticky; top: 0; background: var(--cream-2); z-index: 2; }
+  .es-title { font-size: 17px; font-weight: 800; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .es-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 4px 10px; border-radius: 999px; flex: none; }
+  .es-x { flex: none; width: 30px; height: 30px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; font-size: 14px; color: var(--ink-soft); }
+  .es-body { padding: 18px 22px 4px; }
+  .es-field { margin-bottom: 18px; }
+  .es-lab { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-faint); margin-bottom: 6px; }
+  .es-hint { font-size: 11.5px; color: var(--ink-faint); font-style: italic; margin: -2px 0 7px; }
+  .es-path { font-size: 12.5px; color: var(--bean); margin-bottom: 18px; }
+  .es-seg { display: flex; gap: 7px; flex-wrap: wrap; }
+  .es-segbtn { display: inline-flex; align-items: center; gap: 7px; font-family: inherit; font-size: 12px; cursor: pointer; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink-soft); border-radius: 9px; padding: 8px 11px; }
+  .es-segbtn.is-on { font-weight: 800; color: var(--ink); border-color: var(--ink); background: #f0e6d3; }
+  .es-segbtn.is-on.answer { border-color: #2E7D3E; background: #EAF6EC; color: #2E7D3E; }
+  .es-segbtn.is-on.action { border-color: #9A6A12; background: #FBF1DA; color: #9A6A12; }
+  .es-segbtn.is-on.escalate { border-color: #B5462E; background: #FBE7E0; color: #B5462E; }
+  .es-char { font-size: 10.5px; color: var(--ink-faint); text-align: right; margin: -12px 0 18px; }
+  .es-note { font-size: 12.5px; color: var(--ink-soft); background: var(--paper); border: 1.5px solid var(--line-soft, #efe8da); border-left: 3px solid var(--bean); border-radius: 9px; padding: 11px 13px; margin-bottom: 18px; line-height: 1.5; }
+  .es-foot { display: flex; align-items: center; gap: 9px; padding: 15px 22px 20px; position: sticky; bottom: 0; background: var(--cream-2); border-top: 1px solid var(--line-soft, #efe8da); margin-top: 12px; }
+  .es-btn { font-family: inherit; font-size: 12.5px; cursor: pointer; border-radius: 10px; padding: 10px 15px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink); font-weight: 700; }
+  .es-btn:hover { background: var(--cream-2); }
+  .es-del { color: #B5462E; border-color: #f1c3b4; background: #fbe7e0; }
+  .es-save { background: var(--bean); color: #f5eedf; border-color: var(--bean); }
+  .es-grow { flex: 1; }
+  .mv-card { width: 460px; max-width: 100%; max-height: 80vh; overflow: auto; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 18px; box-shadow: 0 30px 80px -28px rgba(58, 40, 20, .55); padding: 20px 22px; margin: auto; }
+  .mv-h { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+  .mv-sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 16px; line-height: 1.5; }
+  .mv-target { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; font-family: inherit; font-size: 13px; padding: 11px 12px; border-radius: 11px; cursor: pointer; border: 1.5px solid var(--line); background: var(--paper); margin-bottom: 7px; }
+  .mv-target:hover { border-color: #e4d3b4; background: #f0e6d3; }
+  .mv-i { color: var(--ink-faint); width: 12px; text-align: center; flex: none; }
+  @media (min-width: 720px) { .es-scrim { align-items: center; padding: 24px; } .es-sheet { border-radius: 18px; } }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 760px) {
+    .app-shell { padding: 0 14px 80px; }
+    .draft-grid { grid-template-columns: 1fr; }
+    .email-panel { position: static; }
+    .greet-card { grid-template-columns: 1fr; text-align: left; }
+    .greet-bean { justify-self: start; }
+    .greet-text p { max-width: none; }
+    .row-snippet { display: none; }
+    .wordmark { font-size: 22px; }
+    .admin-shell { grid-template-columns: 1fr; }
+    .admin-nav { position: static; flex-direction: row; flex-wrap: wrap; }
+    .admin-nav-title { width: 100%; }
+  }
+  @media (max-width: 420px) {
+    .group-blurb { display: none; }
+    .action-bar .bean-btn { flex: 1 1 100% !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React vendored locally (production builds) — no third-party CDN in the boot path, so an
+       unpkg hiccup can't blank the app. The .jsx files are plain React.createElement (no JSX
+       syntax), so they run as ordinary scripts; Babel was dead weight and is gone. -->
+  <script src="/vendor/react.production.min.js"></script>
+  <script src="/vendor/react-dom.production.min.js"></script>
+
+  <script src="bean-pixel.jsx"></script>
+  <script src="bean-data.jsx"></script>
+  <script src="bean-ui.jsx"></script>
+  <script src="bean-email.jsx"></script>
+  <script src="bean-inbox.jsx"></script>
+  <!-- before bean-draft: the draft card's citation chips read their kind→label map from
+       window.beanCite, so the chip and the sheet it opens can never disagree. -->
+  <script src="bean-cite.jsx"></script>
+  <script src="bean-draft.jsx"></script>
+  <script src="bean-admin.jsx"></script>
+  <script src="bean-notebook.jsx"></script>
+  <script src="bean-proposal.jsx"></script>
+  <script src="bean-questionnaire.jsx"></script>
+  <script src="bean-root.jsx"></script>
+</body>
+</html>
