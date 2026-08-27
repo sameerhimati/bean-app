@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_ROOT = _REPO_ROOT / "data"
@@ -99,6 +100,39 @@ def notebook_path(customer: str | None = None) -> Path:
     return customer_dir(customer) / "notebook.md"
 
 
+def about_path(customer: str | None = None) -> Path:
+    """A few lines about who Bean is and who made it — read ONLY by the chat, never by the engine.
+
+    ⚠️ The separation is the whole point. The notebook rides in the cached system prefix of every
+    DRAFT and its lines are citable, so a fact about the author living in it could be quoted into a
+    reply to a customer. This file is loaded by bean/chat.py alone; bean/engine.py never opens it,
+    and a test pins that. Conversation and drafting are different audiences.
+
+    On the volume with no shipped default, for the same two reasons notebook.md has none: the source
+    tree is public, and a shipped default containing real data is the fixtures-leaked-into-prod bug.
+    Absent ⇒ no block at all ⇒ the chat prompt is byte-identical to what it was before this existed.
+
+    It is NOT a second brain. Nothing here should answer a question about the store — the "me not
+    know that one" refusal for anything outside the notebook stays exactly as it is.
+    """
+    return customer_dir(customer) / "about.md"
+
+
+def notebook_history_path(customer: str | None = None) -> Path:
+    """Every change ever made to the notebook, append-only — the audit trail for the operator's brain.
+
+    One line per changed row: what section, whether it was added/removed/changed, the text before and
+    after, and where the edit came from. Written at PUT /api/notebook, the single writer every path
+    goes through (the chat, the notebook editor, the cite sheet, the questionnaire), so the trail is
+    complete by construction rather than by each caller remembering to log.
+
+    It exists because supersede shipped without it: a confirmed chat proposal REPLACES a line in her
+    brain, and the only record was one rolling `.bak`. "What did Bean change?" had no answer.
+    Distinct from corrections.jsonl, which is feedback on DRAFTS; this is edits to the notebook.
+    Same volume + migration trigger as the corrections log."""
+    return customer_dir(customer) / "notebook_history.jsonl"
+
+
 def notebook_review_path(customer: str | None = None) -> Path:
     """Her in-progress answers while walking the onboarding questionnaire — a small resume file, NOT
     the notebook. The 45-card review is meant to be done across several sittings; this holds what she
@@ -125,6 +159,37 @@ def usage_path(customer: str | None = None) -> Path:
     Bean's spend is inspectable per category over time. FakeModel calls (unit tests) never write here
     — no real token counts. Same volume + migration trigger as the corrections log."""
     return customer_dir(customer) / "usage.jsonl"
+
+
+# The operator's own working day. Every date the product SHOWS her — the stats chart's bars, the
+# inbox timestamps (web/bean-ui.jsx BEAN_TZ, which must stay in step with this) — is rendered in
+# this zone, never in UTC and never in the sender's.
+#
+# Mail arrives stamped with the SENDER's offset, so bucketing on that splits one of her days across
+# two bars whenever a customer writes from another zone; bucketing on UTC pushes everything after
+# 7pm Central into tomorrow. Neither is the day she lived through.
+#
+# A constant because Bean serves one operator. The day it serves a second in another zone this
+# becomes a per-tenant setting — which is a config field and a plumbing change, not a redesign, and
+# it is deliberately NOT built ahead of that day. (Same stance as this module's MULTITENANCY
+# TRIGGER.) `zoneinfo` is stdlib and DST-aware, so CST/CDT is handled without a dependency.
+OPERATOR_TZ = ZoneInfo("America/Chicago")
+
+
+def filed_history_path(customer: str | None = None) -> Path:
+    """Per-day tallies of gate-filed mail that has since been DELETED from inbox.jsonl.
+
+    `inbox.clear_filed` rewrites the inbox to drop filed mail, which is the right behaviour for an
+    inbox and the wrong one for a record: "Bean filed 430 emails you never had to open" is the
+    strongest number the stats page has, and it lived entirely in a log one tap wipes. Before each
+    rewrite, clear_filed rolls up what it is about to delete into this log — day + count, nothing
+    else. It is append-only and never rewritten, so the counts survive every future clear.
+
+    Deliberately NOT the `.bak-filed-*` snapshot clear_filed already writes: that is a full recovery
+    copy of the mail (right for undoing a bad filing, wrong to re-read on every page load), and it
+    accumulates one file per clear. This carries the two fields the chart needs and nothing that
+    could leak a customer's words. Same volume + migration trigger as the corrections log."""
+    return customer_dir(customer) / "filed_history.jsonl"
 
 
 def order_index_path(customer: str | None = None) -> Path:

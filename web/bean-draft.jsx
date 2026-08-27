@@ -14,15 +14,83 @@ function ShopifyRow({ email }) {
   );
 }
 
+// One earlier message. Collapsed rows show a byline and a one-line peek; open rows render through
+// window.EmailBody, which is what gives them real paragraphs and live links.
+function ThreadMessage({ msg, defaultOpen }) {
+  const [open, setOpen] = useStateD(!!defaultOpen);
+  const byline = [msg.who, msg.when].filter(Boolean).join(' · ') || 'Earlier message';
+  const peek = String(msg.text || '').replace(/\s+/g, ' ').slice(0, 90);
+  return React.createElement('div', { className: 'thread-msg' + (open ? '' : ' is-collapsed') },
+    React.createElement('button', {
+      className: 'thread-msg-head', onClick: () => setOpen(!open), 'aria-expanded': open,
+    },
+      React.createElement('span', { className: 'thread-caret' }, open ? '▾' : '▸'),
+      React.createElement('span', { className: 'thread-who' }, byline),
+      !open && React.createElement('span', { className: 'thread-peek' }, peek)
+    ),
+    open && React.createElement(window.EmailBody, { text: msg.text, className: 'thread-body' })
+  );
+}
+
+// The quoted history, as messages instead of as a wall of "> > >".
+//
+// What this replaced rendered `email.thread` — a single raw string holding the ENTIRE quoted
+// conversation — inside one <p>. HTML collapses newlines to spaces, so a thirteen-message chain
+// came out as one run-on paragraph of quote markers and auto-responder boilerplate, under a label
+// that said "· 1 message" because the list it counted always had exactly one element.
+//
+// Now: bean/quoting.py splits it into real messages oldest-first, the newest earlier message opens
+// by default, older ones fold behind one control, and messages positively identified as NOT from
+// the customer (her own autoresponder, mostly) start collapsed. UNKNOWN attribution renders open —
+// collapse what you have identified, never on an absence of evidence.
 function ThreadHistory({ email }) {
-  const thread = email.thread || [];
-  if (!thread.length) return null;
+  const msgs = (email.conversation && email.conversation.length)
+    ? email.conversation
+    // Baked fixtures (bean-data.jsx) carry hand-written paragraph arrays and no `conversation`.
+    : (email.thread || []).map(m => ({ who: '', when: '', text: Array.isArray(m) ? m.join('\n\n') : m, side: 'unknown' }));
+  const [showAll, setShowAll] = useStateD(false);
+  if (!msgs.length) return null;
+
+  const hidden = showAll ? 0 : Math.max(0, msgs.length - 1);
+  const shown = showAll ? msgs : msgs.slice(-1);
+  // Open the most recent message that is NOT the store's own — that is the context worth reading.
+  // Opening "the newest, unless it's theirs" left threads showing nothing at all: her autoresponder
+  // is very often the last thing in the chain, so every row came up collapsed and the block, while
+  // tidy, said less than the wall of quote markers it replaced.
+  let openAt = shown.length - 1;
+  while (openAt > 0 && shown[openAt].side === 'other') openAt--;
   return React.createElement('div', { className: 'thread-history' },
-    React.createElement('div', { className: 'thread-label' }, 'Earlier from ' + email.from.name + ' · ' + thread.length + (thread.length === 1 ? ' message' : ' messages')),
-    thread.map((msg, i) => React.createElement('div', { className: 'thread-msg', key: i },
-      (Array.isArray(msg) ? msg : [msg]).map((p, j) => React.createElement('p', { key: j }, p))
-    )),
+    React.createElement('div', { className: 'thread-label' },
+      'Earlier in this conversation · ' + msgs.length + (msgs.length === 1 ? ' message' : ' messages')),
+    hidden > 0 && React.createElement('button', {
+      className: 'thread-more', onClick: () => setShowAll(true),
+    }, '▸ show ' + hidden + ' earlier'),
+    shown.map((msg, i) => React.createElement(ThreadMessage, {
+      key: (showAll ? 0 : msgs.length - 1) + i,
+      msg,
+      defaultOpen: i === openAt,
+    })),
     React.createElement('div', { className: 'thread-current' }, '↓ latest message')
+  );
+}
+
+// The earlier messages this ONE draft is answering.
+//
+// Without this the operator sees a reply that addresses three questions while the panel shows one
+// email, and has no way to check the other two — the drafts that used to carry them no longer
+// render as their own rows. Folding rows away is only honest if the thing they folded into shows
+// what it swallowed.
+function ConversationStrip({ email }) {
+  const covered = (window.EMAILS || []).filter(e => e.rolledInto === email.id);
+  if (!covered.length) return null;
+  const ordered = [...covered].sort((a, b) => window.beanTimeMs(a.time) - window.beanTimeMs(b.time));
+  return React.createElement('div', { className: 'convo-strip' },
+    React.createElement('div', { className: 'convo-label' },
+      'They wrote ' + (covered.length + 1) + ' times with no reply — this draft answers all of them'),
+    ordered.map(e => React.createElement('div', { className: 'convo-msg', key: e.id },
+      React.createElement('div', { className: 'convo-when' }, window.beanTimeLabel(e.time)),
+      React.createElement(window.EmailBody, { text: e.body, className: 'convo-body' })
+    ))
   );
 }
 
@@ -34,9 +102,14 @@ function EmailPanel({ email }) {
         React.createElement('div', { className: 'email-from' }, email.from.name),
         React.createElement('div', { className: 'email-addr' }, email.from.email)
       ),
-      React.createElement('div', { className: 'email-time' }, email.time)
+      // "Jul 23, 1:13 PM", not "Thu, 23 Jul 2026 16:29:02 +0000 (UTC)". The raw Date header is a
+      // wire format; it was long enough to collide with a two-line sender name and push the header
+      // apart. Same treatment the inbox rows already give it — label to read, raw string on hover.
+      React.createElement('div', { className: 'email-time', title: email.time },
+        window.beanTimeLabel(email.time) || email.time)
     ),
     React.createElement(ShopifyRow, { email }),
+    React.createElement(ConversationStrip, { email }),
     React.createElement(ThreadHistory, { email }),
     React.createElement('div', { className: 'email-subject' }, email.subject),
     // Customer-view render: links live, order refs deep-linked. `email.body` is an array of paragraphs.

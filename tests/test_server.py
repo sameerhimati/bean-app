@@ -68,7 +68,7 @@ def base_url(tmp_path, monkeypatch):
     monkeypatch.setattr(srv, "NOTEBOOK_REVIEW_PATH", tmp_path / "notebook_review.json")
     # Default the gate seam to pass-through so preview tests exercise the engine offline;
     # gate-specific tests override this with their own fake (see test_gate.py).
-    monkeypatch.setattr(srv, "gate", lambda email, rules=None: GateResult("reply"))
+    monkeypatch.setattr(srv, "gate", lambda email, rules=None, customer=None: GateResult("reply"))
     # ...and default the engine to a notebook on disk plus a canned model, so every endpoint that
     # drafts works without a network. Tests that care about the model override it via _engine().
     _install_engine(monkeypatch, tmp_path)

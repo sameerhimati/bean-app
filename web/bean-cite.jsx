@@ -197,5 +197,53 @@ function BeanCiteSheet({ cite, notebook, onSaveNotebook, onLoadReply, onClose })
       head(icon, title), body, foot));
 }
 
+// ---- applying an approved chat proposal -----------------------------------------------------
+// The same operation commitNotebook does above — rebuild the WHOLE notebook with one row changed,
+// and hand it to bean-root's single writer — except the row is found by TEXT rather than by index,
+// and there may be no row to find. It lives here, beside its twin, rather than in bean-chat.jsx,
+// which has no notebook knowledge by construction.
+//
+// `section` → list mapping is deliberately the same one commitNotebook uses; a second, subtly
+// different mapping is how a fact ends up written into `notes`.
+const CLAIM_LISTS = { bucket: 'buckets', macro: 'macros', fact: 'facts', note: 'notes' };
+
+function normalizeLine(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+// Returns { notebook, replaced } — `replaced` is the line actually removed, or '' when this was an
+// addition. The caller says which happened; it never assumes.
+//
+// ⚠️ The supersede invariant: a row is removed ONLY if it is found. If the model named a line that
+// is no longer there (she edited the notebook since it proposed), this appends and reports ''. It
+// never deletes a near-match and never claims a replacement it did not make — guessing which line
+// she meant is how you silently drop the wrong policy.
+function applyClaim(notebook, message, claim) {
+  const text = String(claim == null ? '' : claim).trim();
+  const section = (message && message.section) || 'fact';
+  const listKey = CLAIM_LISTS[section] || 'facts';
+  const rows = (notebook[listKey] || []).slice();
+  if (!text) return { notebook, replaced: '' };
+
+  const target = normalizeLine(message && message.supersedes);
+  const field = listKey === 'buckets' ? 'cliff' : 'text';
+  const at = target ? rows.findIndex(r => normalizeLine(r && r[field]) === target) : -1;
+
+  if (at >= 0) {
+    const replaced = rows[at][field];
+    rows[at] = { ...rows[at], [field]: text };
+    return { notebook: { ...notebook, [listKey]: rows }, replaced };
+  }
+  // A new line. Buckets and macros are NAMED, and a chat proposal carries no name — so an unmatched
+  // bucket/macro proposal lands as a fact instead of inventing a heading she never wrote. Bean can
+  // propose changing a cliff she already has; it cannot conjure a new bucket out of one sentence.
+  if (listKey === 'buckets' || listKey === 'macros') {
+    const facts = (notebook.facts || []).concat([{ text, provenance: 'stated' }]);
+    return { notebook: { ...notebook, facts }, replaced: '' };
+  }
+  const provenance = listKey === 'notes' ? 'observed' : 'stated';
+  return { notebook: { ...notebook, [listKey]: rows.concat([{ text, provenance }]) }, replaced: '' };
+}
+
 window.BeanCiteSheet = BeanCiteSheet;
 window.beanCite = { parseCite, resolveNotebookCite, chipFor };
+window.applyClaim = applyClaim;
+if (typeof module !== 'undefined' && module.exports) { module.exports = { applyClaim, normalizeLine }; }

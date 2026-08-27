@@ -13,7 +13,7 @@ import pytest
 from bean.usage import (
     CACHE_READ_MULTIPLIER,
     CACHE_READ_MULTIPLIER_OPUS,
-    CACHE_WRITE_MULTIPLIER,
+    CACHE_WRITE_MULTIPLIERS,
     PRICES,
     aggregate,
     call_cost,
@@ -54,11 +54,34 @@ def test_call_cost_haiku():
 
 
 def test_call_cost_includes_cache_write_at_input_price():
-    # cache write is priced off the model's INPUT price at CACHE_WRITE_MULTIPLIER (1.25x), not a
-    # separate rate.
+    # cache write is priced off the model's INPUT price at a TTL multiplier, not a separate rate.
+    # No cache_ttl on the line ⇒ the 5-minute rate, which is a FACT about lines written before Bean
+    # ever requested an hour, not a convenient default.
     input_price = PRICES["claude-sonnet-4-6"][0]
     cost = call_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0, cache_read=0, cache_write=2262)
-    assert cost == pytest.approx(2262 * input_price * CACHE_WRITE_MULTIPLIER / 1_000_000)
+    assert cost == pytest.approx(2262 * input_price * CACHE_WRITE_MULTIPLIERS["5m"] / 1_000_000)
+
+
+def test_a_one_hour_cache_write_costs_more_than_a_five_minute_one():
+    """The reason this is per-line data rather than one constant: both rates are live at once,
+    because the log holds ~1,600 writes billed at 1.25x and every new one is billed at 2.0x.
+    Flipping a constant would have retroactively marked up all the history."""
+    input_price = PRICES["claude-sonnet-4-6"][0]
+    five = call_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0, cache_read=0,
+                     cache_write=2262, cache_ttl="5m")
+    hour = call_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0, cache_read=0,
+                     cache_write=2262, cache_ttl="1h")
+    assert hour == pytest.approx(2262 * input_price * 2.0 / 1_000_000)
+    assert hour > five
+
+
+def test_an_unrecognised_ttl_prices_low_rather_than_raising():
+    """A report must still total. Understating is the safe direction for a number the author
+    quotes at himself; raising over one odd string would lose the month."""
+    cheap = call_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0, cache_read=0,
+                      cache_write=2262, cache_ttl="7 fortnights")
+    assert cheap == call_cost("claude-sonnet-4-6", input_tokens=0, output_tokens=0, cache_read=0,
+                              cache_write=2262, cache_ttl="5m")
 
 
 def test_call_cost_cache_read_standard_model_is_point_one_x():

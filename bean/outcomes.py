@@ -28,11 +28,12 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from bean.corrections import Correction, outcome_of
 from bean.inbox import load_inbox
-from bean.paths import inbox_path
+from bean.paths import OPERATOR_TZ, inbox_path
 
 # How many of the most recent walked emails `/healthz` judges on. Long enough that a run of
 # legitimately-escalated mail doesn't read as a stall, short enough that a tree taught yesterday
@@ -155,6 +156,51 @@ def approval_rates(corrections: list[Correction]) -> ApprovalRates:
     total = sum(counts.values())
     mean = round(sum(ratios) / len(ratios), 4) if ratios else None
     return ApprovalRates(counts=counts, total=total, mean_edit_ratio=mean)
+
+
+def daily_counts(inbox: list[dict]) -> tuple[list[dict], int]:
+    """Per-day (filed, drafted) counts, oldest day first, plus how many lines carried no usable date.
+
+    `received_at` is the webhook's RFC-2822 Date header, kept verbatim (bean/inbox.py) — so it does
+    NOT sort as a string and it cannot be truncated to a day. `"Mon, 03 Aug"` and `"Mon, 3 Aug"` are
+    the same day and differ at index 9, so a `[:10]` slice splits one day into two buckets. Parse it.
+
+    The day is the OPERATOR'S day (bean.paths.OPERATOR_TZ), not the sender's and not UTC. A customer
+    in London and one in Dallas stamp the same moment with different offsets, so bucketing on the
+    message's own offset silently splits one of her working days across two bars — and bucketing on
+    UTC moves everything after 7pm Central into tomorrow. She reads this chart to see her own days,
+    so the zone has to be hers.
+
+    `undated` is returned rather than dropped or silently bucketed under a guessed day — a chart that
+    quietly omits mail is the failure mode this whole module exists to end. Callers show it.
+    """
+    per_day: dict[str, dict[str, int]] = {}
+    undated = 0
+    for item in inbox:
+        raw = (item.get("received_at") or "").strip()
+        day = None
+        if raw:
+            try:
+                parsed = parsedate_to_datetime(raw)
+            # parsedate_to_datetime raises on malformed input in 3.10+ and returned None before it;
+            # a TypeError catches the None path's later .date() too. An unparseable date is a data
+            # quirk, never a reason to 500 the page.
+            except (ValueError, TypeError):
+                parsed = None
+            if parsed is not None:
+                # A Date header with no offset parses as naive; treat it as already-local rather
+                # than crashing astimezone(), which refuses naive input on some platforms.
+                if parsed.tzinfo is None:
+                    day = parsed.date().isoformat()
+                else:
+                    day = parsed.astimezone(OPERATOR_TZ).date().isoformat()
+        if day is None:
+            undated += 1
+            continue
+        bucket = per_day.setdefault(day, {"filed": 0, "drafted": 0})
+        bucket["drafted" if _is_walked(item.get("result") or {}) else "filed"] += 1
+    rows = [{"day": d, **counts} for d, counts in sorted(per_day.items())]
+    return rows, undated
 
 
 def drafting_stalled(outcomes: Outcomes) -> bool:

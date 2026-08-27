@@ -102,7 +102,7 @@ def open_url(tmp_path, monkeypatch):
     "this route still exists without the flag" must not depend on a live model."""
     _seed_into(tmp_path, monkeypatch)
     monkeypatch.setattr(srv, "DEMO_READONLY", False)
-    monkeypatch.setattr(srv, "gate", lambda email, rules=None: GateResult("reply"))
+    monkeypatch.setattr(srv, "gate", lambda email, rules=None, customer=None: GateResult("reply"))
     monkeypatch.setattr(srv, "ModelAdapter", lambda *a, **k: FakeModel({"draft": {
         "bucket": "Sofas & Upholstery", "draft": "hi", "citations": ["notebook:Sofas & Upholstery"],
         "confidence": "green", "why_unsure": [],
@@ -196,7 +196,13 @@ def test_the_demo_serves_its_inbox_config_and_notebook_with_no_key(demo_url):
 
     status, body = _req(f"{demo_url}/api/inbox")
     assert status == 200
-    assert body["emails"] == load_demo_inbox()
+    # The route serves each stored row verbatim PLUS a derived `conversation` (bean/quoting.py
+    # unpacking the quoted history into real messages). Everything the seed wrote is still on the
+    # wire byte-for-byte — the derived field is additive, which is what lets old stored mail render
+    # correctly without a migration.
+    served = [{k: v for k, v in e.items() if k != "conversation"} for e in body["emails"]]
+    assert served == load_demo_inbox()
+    assert all("conversation" in e for e in body["emails"])
     assert any(e["result"].get("confidence") == "green" for e in body["emails"])
 
     status, body = _req(f"{demo_url}/api/config")

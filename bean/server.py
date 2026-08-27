@@ -31,7 +31,7 @@ import re
 import threading
 import time
 from datetime import datetime, timezone
-from dataclasses import replace
+from dataclasses import asdict, replace
 from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,24 +41,28 @@ from urllib.parse import parse_qs, urlsplit
 from bean.config import Config, ConfigCorruptError, load_config
 from bean.corrections import Correction, CorrectionsCorruptError, few_shot_examples, load, record
 from bean.paths import (
-    config_path, corrections_path, customer_dir, data_root, default_customer, inbox_path,
-    last_inbound_path, notebook_path, notebook_review_path, order_index_path,
-    status_path, waitlist_path,
+    config_path, corrections_path, customer_dir, data_root, default_customer, filed_history_path,
+    inbox_path, last_inbound_path, notebook_path, notebook_review_path, order_index_path,
+    status_path, waitlist_path, about_path, notebook_history_path,
 )
+from bean import chat, notebook_history
 from bean.adapter import ModelAdapter
 from bean.contract import Email, draft_dict
 from bean.customer_history import history_block
 from bean.engine import draft_email
 from bean.gate import needs_reply as gate  # injectable gate seam (monkeypatched offline in tests)
 from bean.inbound import email_from_postmark, reply_target
-from bean.inbox import InboxItem, append_inbox, clear_filed, load_inbox
+from bean.inbox import (InboxItem, append_inbox, clear_filed, clear_ids, load_drafted_history,
+                        load_filed_history, load_inbox, supersede_results)
 from bean.llm import DRAFT_MODEL, OutOfCreditsError
 from bean.notebook import Notebook, load as load_notebook
 from bean.shelf import top_exemplars
 from bean.notification_parser import parse_notification
-from bean.outcomes import approval_rates, drafting_stalled, recent_outcomes
+from bean.outcomes import aggregate, approval_rates, daily_counts, drafting_stalled, recent_outcomes
 from bean.store import write_json_atomic
 from bean.order_index import record_order
+from bean import conversation, quoting
+from bean.usage import render_table as render_usage_table, report as usage_report, totalize
 
 log = logging.getLogger("bean.server")
 
@@ -130,8 +134,13 @@ DEMO_READONLY: bool = os.environ.get("BEAN_DEMO_READONLY", "").strip().lower() i
 # running?" — misleading, but it is also the only route that spends money, so it stays locked and the
 # copy is the thing to fix if that screen matters for the demo.
 _DEMO_LOCKED_ROUTES = frozenset({
-    "/api/correction", "/api/status", "/api/clear-filed", "/api/config",
+    "/api/correction", "/api/status", "/api/clear-filed", "/api/clear-handled", "/api/config",
     "/api/notebook", "/api/notebook/review", "/api/preview", "/api/inbound",
+    # /api/chat spends a token per turn and exists to change somebody's notebook. Both halves of
+    # the "writes or spends" rule above, so a demo visitor never reaches it.
+    "/api/chat",
+    # Rewrites inbox.jsonl AND spends a drafting call — both halves of the same rule.
+    "/api/redraft",
 })
 
 # The parsed notebook, memoized on (path, mtime): a PUT rewrites the file (Notebook.save → os.replace,
@@ -161,6 +170,7 @@ _auth_failures: dict[str, list[float]] = {}   # ip -> recent failed-auth timesta
 _auth_lockouts: dict[str, float] = {}          # ip -> locked-until (epoch seconds)
 _inbound_hits: list[float] = []                # recent inbound-webhook timestamps (global — one tenant)
 _preview_hits: list[float] = []                # recent /api/preview timestamps (global — one operator)
+_chat_hits: list[float] = []                   # recent /api/chat timestamps (global — one operator)
 _waitlist_hits: list[float] = []               # recent /api/waitlist timestamps (global — public)
 _AUTH_MAX_FAILURES = 10    # failures within the window before an IP is locked out
 _AUTH_WINDOW = 300         # seconds the failure count looks back over
@@ -189,6 +199,14 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # same client address, so a per-IP window would be a global window wearing a disguise. One customer,
 # one operator, one ceiling.
 _PREVIEW_MAX_PER_MIN = 20
+
+# /api/chat is the same class of spend: one drafting-tier call over the notebook prefix per turn.
+# 20/min for the same reason — a person typing sentences and reading proposals cannot personally
+# exceed it, so anything past it is a loop or a stolen passcode.
+_CHAT_MAX_PER_MIN = 20
+# One turn is a sentence or two. The cap is a spend guard as much as a parse guard: the message
+# rides in the UNCACHED half of the prompt, so an enormous paste would be billed in full, every turn.
+_CHAT_MAX_CHARS = 4000
 
 # _auth_failures / _auth_lockouts stay IN MEMORY, and reset on redeploy. That is a real weakness —
 # a patient attacker retries exactly when the process restarts — and it is still the right call:
@@ -694,7 +712,7 @@ _JOIN_PAGE = ("""<!doctype html>
     <div class="demo">
       <video src="/demo.mp4" autoplay muted loop playsinline preload="metadata"
              aria-label="Bean sorting an inbox into ready-to-send, worth-a-look, and needs-you"></video>
-      <div class="cap">A real inbox, sorted surest first &mdash;
+      <div class="cap">A real inbox, triaged and colour-coded by how sure Bean is &mdash;
         <a href="https://bean-demo-production.up.railway.app">click through it yourself</a>.
         No signup, no API key.</div>
     </div>
@@ -744,7 +762,9 @@ _JOIN_PAGE = ("""<!doctype html>
 """)
 
 
-def _run_engine(email: Email, config, corrections: list) -> tuple[object, dict]:
+def _run_engine(
+    email: Email, config, corrections: list, *, conversation: str | None = None
+) -> tuple[object, dict]:
     """One email → (result, stored-dict) via the notebook engine.
 
     Returns a DraftResult (situation bucket, groundedness, citations) from ONE model call over the
@@ -757,11 +777,109 @@ def _run_engine(email: Email, config, corrections: list) -> tuple[object, dict]:
     notebook, not the config, is where the operator's judgment lives now."""
     notebook = _current_notebook()  # FileNotFoundError if the notebook isn't approved yet
     email_text = f"{email.subject}\n{email.body}"
-    exemplars = top_exemplars(corrections, email_text, k=3)
+    # exclude_id/exclude_subject keep this email's OWN conversation out of its own precedent — the
+    # thread is already in the prompt separately (see engine._user_message). Same stance as
+    # history_block's exclude_id on the line below.
+    exemplars = top_exemplars(corrections, email_text, k=3,
+                              exclude_id=email.id, exclude_subject=email.subject)
     history = history_block(email.sender_email, exclude_id=email.id, customer=CUSTOMER)
-    adapter = ModelAdapter(DRAFT_MODEL)
-    result = draft_email(notebook, exemplars, list(email.thread), history, email, adapter)
+    adapter = ModelAdapter(DRAFT_MODEL, customer=CUSTOMER)
+    result = draft_email(
+        notebook, exemplars, list(email.thread), history, email, adapter, conversation=conversation
+    )
     return result, draft_dict(result)
+
+
+def _as_inbox_dict(email: Email, payload: dict, reply_to: str, result: dict) -> dict:
+    """The email in the shape the inbox log stores, before it is written. Lets the conversation
+    reader treat the message in hand and the ones already on disk as the same kind of thing."""
+    return {
+        "id": email.id, "sender_name": email.sender_name, "sender_email": email.sender_email,
+        "reply_to": reply_to, "subject": email.subject, "body": email.body,
+        "received_at": payload.get("Date") or "", "thread": list(email.thread), "result": result,
+    }
+
+
+def _open_siblings_of(email: Email, payload: dict) -> list[dict]:
+    """Earlier mail in this email's conversation that nobody has replied to yet.
+
+    Degrades to "no siblings" on any read failure: grouping is an enhancement, and failing to notice
+    a conversation must never take down the triage of the email actually in hand. That is the same
+    stance customer_history.history_block takes for the same reason.
+    """
+    try:
+        inbox = load_inbox(inbox_path(CUSTOMER))
+        # status_path() resolved fresh, NOT the module-level STATUS_PATH: that constant binds the
+        # data dir at import, so any caller that sets BEAN_DATA_DIR afterwards reads a different
+        # file than this would. customer_history.history_block resolves it per call for the same
+        # reason, and this has to agree with it — they answer the same question about the same mail.
+        return conversation.open_siblings(
+            _as_inbox_dict(email, payload, "", {}), inbox, _read_status(status_path(CUSTOMER))
+        )
+    except Exception as exc:  # noqa: BLE001 - never block the mail on a grouping read
+        log.warning("conversation lookup failed for %s: %s — drafting it standalone", email.id, exc)
+        return []
+
+
+def _roll_siblings_into(email_id: str) -> None:
+    """Mark this conversation's earlier open mail as answered BY this draft.
+
+    Called under _STATE_LOCK, after the append, so the siblings are re-read from the file the new
+    email is already in — a sibling that arrived during the model call is caught, not clobbered.
+
+    The row keeps its own stored verdict; only `rolled_into` is added, so nothing is destroyed and
+    the UI can still show what Bean originally made of each message. `supersede_results` is the
+    existing mechanism for exactly this (timestamped backup, atomic replace, every other line
+    byte-for-byte) — the same one re-triage uses.
+    """
+    try:
+        inbox = load_inbox(inbox_path(CUSTOMER))
+        me = next((i for i in inbox if i.get("id") == email_id), None)
+        if me is None:
+            return
+        updates = {
+            sib["id"]: {**(sib.get("result") or {}), "rolled_into": email_id}
+            for sib in conversation.open_siblings(me, inbox, _read_status(status_path(CUSTOMER)))
+        }
+        if updates:
+            supersede_results(updates, inbox_path(CUSTOMER))
+            log.info("rolled %d earlier message(s) into the draft for %s", len(updates), email_id)
+    except Exception as exc:  # noqa: BLE001 - the draft is already saved; grouping is cosmetic here
+        log.warning("could not roll siblings into %s: %s", email_id, exc)
+
+
+def _edit_source(headers) -> str:
+    """Where a notebook edit came from — `chat` when Bean proposed it and she confirmed, `editor`
+    for everything she typed herself.
+
+    A HEADER rather than a body field, because the PUT body IS the notebook: adding a key to it
+    would push a non-notebook field through `Notebook.from_dict`. Unrecognised values fall back to
+    `editor` — the log should never claim Bean made a change it cannot prove Bean made.
+    """
+    return "chat" if str(headers.get("X-Bean-Source", "")).strip().lower() == "chat" else "editor"
+
+
+def _with_conversation(items: list[dict]) -> list[dict]:
+    """Each inbox row plus a `conversation`: the quoted history unpacked into real messages.
+
+    Computed at SERVE time rather than at parse time, deliberately. A parse-time-only fix would
+    write a proper list for new mail and leave every email already in the queue rendering as the
+    single un-split blob it was stored as — the operator's actual inbox, unfixed. Deriving it here
+    costs a few ms over the whole log and repairs all of it, with `thread` still on the wire
+    byte-for-byte so nothing downstream has to know this happened.
+
+    The JSONL→SQLite trigger in bean/paths.py is where this stops being free; it is the same read
+    customer_history.load_inbox already does per email, so it moves with that migration, not before.
+    """
+    out = []
+    for item in items:
+        messages = quoting.split_quoted(
+            "\n".join(item.get("thread") or []),
+            item.get("sender_email") or "",
+            item.get("sender_name") or "",
+        )
+        out.append({**item, "conversation": [asdict(m) for m in messages]})
+    return out
 
 
 def _read_status(path: Path) -> dict:
@@ -838,6 +956,110 @@ def _learning_summary(corrections: list[Correction]) -> dict:
             ],
         }
     return out
+
+
+# The day the CURRENTLY RUNNING engine started serving production. `49f6b53` deleted the routing
+# tree on 2026-07-30 and it reached prod on 2026-08-03 (`97b9c03`), so every verdict she graded
+# before this date was produced by an engine that no longer exists. Grading today's Bean on them is
+# the "stored verdicts are fossils" trap, which is why the windowed number exists at all.
+#
+# A DATE, not an id-join against inbox.jsonl — which is what this used to be, and which broke the
+# first time the operator cleared her inbox (2026-08-21): every actioned email was deleted, so the
+# join found nothing and the page reported 0 graded drafts. A date cut cannot be erased by clearing
+# mail. The source comment on _stats_summary predicted exactly this and named this fix.
+#
+# Move this the day the engine changes again. It is a fact about the code, not a preference.
+ENGINE_ERA_START = "2026-08-03"
+
+
+def _loop_block(corrections: list[Correction], *, undated: int = 0) -> dict:
+    """The draft-outcome tally as JSON, straight off `outcomes.approval_rates` — one taxonomy
+    (`corrections.outcome_of`), never a second copy of it living in the read surface."""
+    rates = approval_rates(corrections)
+    return {
+        "graded": rates.total,
+        # Rows written before Correction grew a `ts`. Reported rather than folded either way: they
+        # are real gradings whose date is unknown, and both silently counting them and silently
+        # dropping them would misstate the window. Self-healing — `corrections.record` stamps every
+        # new row, so this only ever counts down.
+        "undated": undated,
+        "approved_untouched": rates.counts.get("approved_untouched", 0),
+        "approved_edited": rates.counts.get("approved_edited", 0),
+        "rewritten": rates.counts.get("rewritten", 0),
+        "escalated": rates.counts.get("escalated", 0),
+        "rate": round(rates.rate, 4),
+        "mean_edit_ratio": rates.mean_edit_ratio,
+    }
+
+
+def _stats_summary(inbox: list[dict], corrections: list[Correction], archived: dict[str, int],
+                   drafted_archive: dict[str, int] | None = None) -> dict:
+    """What Bean DID for the operator — the value view behind the stats page.
+
+    Deliberately carries no cost, no token count and no model name. This is the page that answers
+    "what did Bean do for me", and the honest answer to that question does not contain the author's
+    margin; spend lives on the owner-only GET /api/usage instead. Keep it that way — the day this
+    payload grows a dollar field is the day the invoice starts arguing with itself.
+
+    Every number here is computed by a module that already owns it: the verdict mix by
+    `outcomes.aggregate`, the daily series by `outcomes.daily_counts`, the draft outcomes by
+    `outcomes.approval_rates`. Nothing is re-derived locally, so the stats page and `/healthz` can
+    never disagree about what Bean did.
+
+    TWO WINDOWS, both reported, because one of them is a fossil. `loop` counts only drafts on mail
+    still in `inbox.jsonl` — the corpus the CURRENTLY RUNNING engine produced, which is the roadmap's
+    "window the approval rate to the engine currently running". `loop_lifetime` counts every row,
+    including verdicts made by the routing tree that no longer exists. The windowed one is the honest
+    headline; the lifetime one is kept beside it so the difference is visible rather than quietly
+    chosen. Once corrections carry a timestamp the window should become a date cut, which survives
+    the operator clearing their inbox — the id-join does not.
+
+    `archived` folds in filed mail that `clear_filed` has already deleted (see
+    paths.filed_history_path), so the filed count is not silently reset by an inbox clear.
+    """
+    verdicts = aggregate(inbox)
+    rows, undated = daily_counts(inbox)
+
+    drafted_archive = drafted_archive or {}
+    by_day = {r["day"]: dict(r) for r in rows}
+    for day, count in archived.items():
+        bucket = by_day.setdefault(day, {"day": day, "filed": 0, "drafted": 0})
+        bucket["filed"] += count
+    # ...and the drafted mail the Clear sweep deleted, for the same reason: a bar that drops to zero
+    # because the operator tidied up is a chart lying about what Bean did.
+    for day, count in drafted_archive.items():
+        bucket = by_day.setdefault(day, {"day": day, "filed": 0, "drafted": 0})
+        bucket["drafted"] += count
+    daily = [by_day[d] for d in sorted(by_day)]
+
+    # THE WINDOW IS A DATE CUT. See ENGINE_ERA_START for why it is not the id-join it used to be.
+    dated = [c for c in corrections if (c.ts or "").strip()]
+    windowed = [c for c in dated if c.ts[:10] >= ENGINE_ERA_START]
+    undated = len(corrections) - len(dated)
+    archived_filed = sum(archived.values())
+    archived_drafted = sum(drafted_archive.values())
+    return {
+        "daily": daily,
+        "undated": undated,
+        "totals": {
+            "handled": verdicts.walked + verdicts.filed + archived_filed + archived_drafted,
+            "drafted": verdicts.walked + archived_drafted,
+            "filed": verdicts.filed + archived_filed,
+            "archived_filed": archived_filed,
+            "archived_drafted": archived_drafted,
+        },
+        # `unknown` is surfaced, not folded into a neighbour: a stored result whose confidence this
+        # code doesn't recognize is a data bug, and hiding it in `red` would flatter Bean's caution
+        # exactly the way `Outcomes.unknown` exists to prevent.
+        "confidence": {
+            "green": verdicts.high, "yellow": verdicts.low,
+            "red": verdicts.flag, "unknown": verdicts.unknown,
+        },
+        "loop": _loop_block(windowed, undated=undated),
+        "loop_lifetime": _loop_block(corrections),
+        "loop_basis": f"drafts graded on or after {ENGINE_ERA_START} (the current engine)",
+        "loop_since": ENGINE_ERA_START,
+    }
 
 
 # The gate's labelled errors, both directions. `misfile` = Bean filed it and she wanted a reply;
@@ -958,6 +1180,13 @@ def _corrections_list(corrections: list[Correction], *, limit: int = 200) -> dic
             "action": c.action,
             "is_exemplar": _is_exemplar(c),
             "edit_kind": c.edit_kind or "",
+            # Both of these were computed, written to the volume, and then dropped right here — the
+            # recurring shape in this codebase (the writer is fine, the CONSUMER silently drops it).
+            # `edit_ratio` is the leading indicator the approval count cannot see: it says how much
+            # of the draft survived, so a yellow getting closer to green is visible weeks before the
+            # untouched count moves. `ts` is what makes any of it a trend.
+            "ts": c.ts or "",
+            "edit_ratio": c.edit_ratio,
             "liked": bool(c.liked),
             "note": c.note or "",
             "final_text": cap(c.final_text),
@@ -1142,6 +1371,27 @@ class BeanHandler(SimpleHTTPRequestHandler):
         legacy = hmac.compare_digest(got, secret)
         return new or legacy
 
+    def _owner_authed(self) -> bool:
+        """The SECOND secret, for routes the operator must not see.
+
+        The passcode is hers — she types it every day — so "behind the passcode" is not a control
+        over her, only over the internet. `/api/usage` reports what Bean COSTS to run, which is the
+        author's number and not hers, and the stats page exists precisely so the cost line never
+        appears next to the value line. That separation needs a secret she does not hold.
+
+        `BEAN_OWNER_PASSCODE` unset ⇒ the route does not exist at all (404, see the caller), rather
+        than falling open the way `_authed` does on an empty `BEAN_PASSCODE`. Fail closed: an
+        unset owner secret must never mean "everyone is the owner", and the cost of getting that
+        backwards is a customer reading her own margin.
+        """
+        secret = os.environ.get("BEAN_OWNER_PASSCODE", "")
+        if not secret:
+            return False
+        got = self.headers.get("Authorization", "")
+        if got.lower().startswith("bearer "):
+            got = got[7:]
+        return hmac.compare_digest(got, secret)
+
     def _send_passcode_page(self, status: int = 401) -> None:
         """The passcode page. 401 by default; 200 only at the app's entry paths (see _gate).
 
@@ -1241,6 +1491,55 @@ class BeanHandler(SimpleHTTPRequestHandler):
 
     # ---- routing -----------------------------------------------------------------------------
 
+    def _serve_usage(self) -> None:
+        """GET /api/usage — what Bean COST to run, for the author only.
+
+        `bean/usage.py` has had the price table, the aggregator and the table renderer since the
+        first real model call, and is tested. What it never had was a reader: nothing in production
+        has ever opened usage.jsonl, so Bean's spend accrued for a month on a volume nobody could
+        see without an ssh. This is that read path, and it is the whole of the change — the pricing
+        lives in usage.py and is not restated here.
+
+        `?customer=` is accepted so one deploy can report on any tenant it hosts; it defaults to this
+        process's own. `?format=text` returns `render_table` verbatim, because the fastest way to
+        read this is still a terminal.
+        """
+        if not os.environ.get("BEAN_OWNER_PASSCODE", ""):
+            # 404, not 403: with no owner secret configured this route genuinely does not exist, and
+            # saying "forbidden" would confirm to an unauthenticated caller that it otherwise would.
+            return self._send_json(404, {"error": "not found"})
+        if not self._owner_authed():
+            return self._send_json(401, {"error": "unauthorized"})
+        qs = parse_qs(urlsplit(self.path).query)
+        customer = (qs.get("customer") or [CUSTOMER])[0].strip() or CUSTOMER
+        rows = usage_report(customer=customer)
+        if (qs.get("format") or [""])[0] == "text":
+            body = render_usage_table(rows).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return self.wfile.write(body)
+        total = totalize(rows)
+        return self._send_json(200, {
+            "customer": customer,
+            "rows": [{
+                "model": r.model, "purpose": r.purpose, "calls": r.calls,
+                "cost": round(r.total_cost, 6), "unpriced_calls": r.unpriced_calls,
+                "input_tokens": r.input_tokens, "output_tokens": r.output_tokens,
+                "cache_read": r.cache_read, "cache_write": r.cache_write,
+                "cache_hit_rate": round(r.cache_hit_rate, 4),
+            } for _, r in sorted(rows.items())],
+            "total": {
+                "calls": total.calls, "cost": round(total.total_cost, 6),
+                "unpriced_calls": total.unpriced_calls,
+                "input_tokens": total.input_tokens, "output_tokens": total.output_tokens,
+                "cache_read": total.cache_read, "cache_write": total.cache_write,
+                "cache_hit_rate": round(total.cache_hit_rate, 4),
+            },
+        })
+
     def do_GET(self):  # noqa: N802
         # Before the gate on purpose: a healthcheck that needs the passcode cannot verify a deploy,
         # and this is the one surface an operator (or a deploy script) may touch without a secret.
@@ -1256,6 +1555,11 @@ class BeanHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        # Before the passcode gate, like /healthz and /join, because it carries its OWN secret and
+        # deliberately not the operator's cookie: the passcode is hers, and this route is the one
+        # thing she must not be able to open. See _owner_authed.
+        if self.path.split("?", 1)[0] == "/api/usage":
+            return self._serve_usage()
         if not self._gate():
             return
         path = self.path.split("?", 1)[0]
@@ -1275,9 +1579,16 @@ class BeanHandler(SimpleHTTPRequestHandler):
             # to a real inbound domain — the UI then falls back to a friendly placeholder).
             return self._send_json(200, {"inbound_address": os.environ.get("BEAN_INBOUND_ADDRESS", "")})
         if path == "/api/inbox":
-            return self._send_json(200, {"emails": load_inbox(inbox_path(CUSTOMER))})
+            return self._send_json(200, {"emails": _with_conversation(load_inbox(inbox_path(CUSTOMER)))})
         if path == "/api/status":
             return self._send_json(200, _read_status(STATUS_PATH))
+        if path == "/api/notebook/history":
+            # The audit trail for her brain. Newest first — "what changed recently" is the question
+            # it exists to answer, so the answer should not start with last month.
+            rows = notebook_history.load(notebook_history_path(CUSTOMER))
+            return self._send_json(200, {
+                "changes": [asdict(c) for c in reversed(rows)], "count": len(rows),
+            })
         if path == "/api/notebook/review":
             # Her answers-so-far in the onboarding walk — so a 45-card review survives being closed
             # and reopened. {} = nothing saved yet (or she finished and it was cleared). Behind the
@@ -1288,6 +1599,21 @@ class BeanHandler(SimpleHTTPRequestHandler):
             if corrections is None:
                 return  # 503 already sent — an unreadable log must not render as "you taught nothing"
             return self._send_json(200, _learning_summary(corrections))
+        if path == "/api/stats":
+            # The operator's value view: what Bean did with their mail. Same passcode gate as
+            # /api/learning (it carries volume counts, not mail) and read-only, so it needs no
+            # _DEMO_LOCKED_ROUTES entry — the demo renders it from the seeded fixture inbox, with the
+            # loop metrics honestly empty because a demo tenant has no corrections log by design
+            # (bean/demo.py tenant_is_taught).
+            corrections = self._load_corrections_or_503()
+            if corrections is None:
+                return  # 503 already sent — an unreadable log must not render as "you taught nothing"
+            return self._send_json(200, _stats_summary(
+                load_inbox(inbox_path(CUSTOMER)),
+                corrections,
+                load_filed_history(filed_history_path(CUSTOMER)),
+                load_drafted_history(filed_history_path(CUSTOMER)),
+            ))
         if path == "/api/gate-proposals":
             # The gate's own read surface: rules Bean derives from the mis-files she already logged.
             # Needs the config too, so a pattern she has already added stops being proposed.
@@ -1465,6 +1791,15 @@ class BeanHandler(SimpleHTTPRequestHandler):
                 nb = Notebook.from_dict(data)  # clamps stakes/provenance, drops blank rows — the boundary
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 return self._send_json(400, {"error": f"invalid notebook: {exc}"})
+            # The audit trail for her brain, written HERE because this is the one writer every
+            # edit path goes through (chat, notebook editor, cite sheet, questionnaire). Logging at
+            # the writer makes the trail complete by construction — nothing can edit the notebook
+            # and skip it. Best-effort: a failed log must never cost her the save that succeeded.
+            try:
+                changes = notebook_history.diff(current, nb, source=_edit_source(self.headers))
+                notebook_history.record(changes, log_path=notebook_history_path(CUSTOMER))
+            except Exception as exc:  # noqa: BLE001 - the notebook is the artifact; the log is not
+                log.warning("could not record notebook history: %s", exc)
             nb.save(NOTEBOOK_PATH)
             # Approving the notebook is the end of the onboarding walk — the resume file has done its
             # job, so drop it. Reopening the walk later then starts clean, not mid-old-session. Best-
@@ -1498,6 +1833,36 @@ class BeanHandler(SimpleHTTPRequestHandler):
         with _STATE_LOCK:
             removed, kept = clear_filed(inbox_path(CUSTOMER))
         log.info("clear-filed: removed %d filed items, %d kept", removed, kept)
+        return self._send_json(200, {"ok": True, "removed": removed, "kept": kept})
+
+    # Which states the "clear the handled pile" sweep is allowed to delete. NOT 'skipped': snoozed
+    # means "come back to this", and a sweep that ate her later-pile would be the one deletion she
+    # could not have predicted. NOT 'pending' for the obvious reason. Everything else is mail she has
+    # explicitly finished with — sent, or cleared by hand.
+    _SWEEPABLE_STATES = frozenset({"approved", "handled"})
+
+    def _handle_clear_handled(self) -> None:
+        """Delete the mail the operator has already ACTIONED, on her one-tap 'Clear handled'.
+
+        The ids come from status.json read HERE, never from the request body. A POST that named its
+        own ids would be a delete-any-email primitive pointed at her real customer mail, and the
+        server already holds the only authority on what she marked done. The body is ignored entirely.
+
+        status.json is pruned of the same ids in the same lock: the email is gone, so a state for it
+        is a key that can never be read again, and the map is loaded on every page open.
+
+        Under _STATE_LOCK like clear_filed and the status upsert — a concurrent inbound append must
+        not interleave with the rewrite.
+        """
+        with _STATE_LOCK:
+            status = _read_status(STATUS_PATH)
+            ids = [eid for eid, st in status.items() if st in self._SWEEPABLE_STATES]
+            removed, kept = clear_ids(ids, inbox_path(CUSTOMER))
+            if removed:
+                write_json_atomic(STATUS_PATH, {
+                    eid: st for eid, st in status.items() if st not in self._SWEEPABLE_STATES
+                }, backup=False)
+        log.info("clear-handled: removed %d actioned items, %d kept", removed, kept)
         return self._send_json(200, {"ok": True, "removed": removed, "kept": kept})
 
     def _handle_post_status(self) -> None:
@@ -1555,12 +1920,18 @@ class BeanHandler(SimpleHTTPRequestHandler):
             return
         if path == "/api/preview":
             return self._handle_preview()
+        if path == "/api/chat":
+            return self._handle_chat()
+        if path == "/api/redraft":
+            return self._handle_redraft()
         if path == "/api/status":
             return self._handle_post_status()
         if path == "/api/correction":
             return self._handle_correction()
         if path == "/api/clear-filed":
             return self._handle_clear_filed()
+        if path == "/api/clear-handled":
+            return self._handle_clear_handled()
         return self._send_json(404, {"error": "not found"})
 
     def _preview_over_rate(self) -> bool:
@@ -1571,6 +1942,132 @@ class BeanHandler(SimpleHTTPRequestHandler):
             _preview_hits[:] = [t for t in _preview_hits if now - t < 60]
             _preview_hits.append(now)
             return len(_preview_hits) > _PREVIEW_MAX_PER_MIN
+
+    def _handle_redraft(self) -> None:
+        """Re-draft ONE conversation, on the operator's tap, answering everything still open in it.
+
+        Mail triaged before conversations existed got a draft per message — her queue holds 13 such
+        pile-ups, each with two to four unanswered messages and a draft that only ever read the last
+        one. This is the inbound path (bean/server.py:_handle_inbound) with the operator pulling the
+        trigger instead of the mail: same conversation block, same engine, same `rolled_into` marking
+        through supersede_results.
+
+        Deliberately per-conversation and never a backfill. A sweep over the whole log would spend
+        real money on mail she may never reopen; one tap spends one draft on the one she is looking at.
+
+        Shares /api/preview's ceiling rather than adding a second one — both are operator-triggered
+        drafting calls, and what needs bounding is the total spend, not each button separately.
+        """
+        if self._preview_over_rate():
+            log.warning("redraft over %d/min — 429", _PREVIEW_MAX_PER_MIN)
+            return self._send_json(429, {"error": "rate limited — too many drafts"})
+        try:
+            data = self._read_json()
+        except json.JSONDecodeError as exc:
+            return self._send_json(400, {"error": f"invalid JSON: {exc}"})
+        email_id = str((data or {}).get("email_id") or "").strip() if isinstance(data, dict) else ""
+        if not email_id:
+            return self._send_json(400, {"error": "missing 'email_id'"})
+
+        inbox = load_inbox(inbox_path(CUSTOMER))
+        row = next((i for i in inbox if i.get("id") == email_id), None)
+        if row is None:
+            return self._send_json(404, {"error": "no such email"})
+        if conversation.is_filed(row):
+            # Filed mail has no draft to replace; the Filed/FYI lane's own "needs a reply" recovery
+            # is the route back, and it goes through the gate rather than around it.
+            return self._send_json(409, {"error": "that one is filed — use “needs a reply” instead"})
+
+        status = _read_status(status_path(CUSTOMER))
+        siblings = conversation.open_siblings(row, inbox, status)
+        conv = conversation.build(siblings + [row], status)
+        block = conversation.render_for_prompt(conv)
+        if not block:
+            # Nothing outstanding behind it, so a re-draft would produce what is already on screen.
+            # Refusing is cheaper and more honest than charging her for an identical draft.
+            return self._send_json(409, {"error": "nothing else is waiting in that conversation"})
+
+        email = Email(
+            id=row.get("id") or "", sender_name=row.get("sender_name") or "",
+            sender_email=row.get("sender_email") or "", subject=row.get("subject") or "",
+            body=row.get("body") or "", thread=list(row.get("thread") or []),
+        )
+        config = self._load_config_or_503()
+        if config is None:
+            return
+        corrections = self._load_corrections_or_503()
+        if corrections is None:
+            return
+        try:
+            _, result_d = _run_engine(email, config, corrections, conversation=block)
+        except OutOfCreditsError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - a model failure must not 500, and must not mutate
+            log.warning("redraft failed for %s: %s", email_id, exc)
+            return self._send_json(502, {"error": "Bean couldn't reach its brain just now — try again in a moment."})
+
+        # Both writes under one lock and one rewrite: the new verdict, and the siblings folded into
+        # it. Doing them separately would leave a window where the queue shows two drafts for one
+        # reply, which is the state this endpoint exists to leave behind.
+        with _STATE_LOCK:
+            updates = {email_id: result_d}
+            for sib in siblings:
+                updates[sib["id"]] = {**(sib.get("result") or {}), "rolled_into": email_id}
+            supersede_results(updates, inbox_path(CUSTOMER))
+        log.info("redrafted %s over %d earlier message(s)", email_id, len(siblings))
+        return self._send_json(200, {"email_id": email_id, "covered": len(siblings) + 1, **result_d})
+
+    def _chat_over_rate(self) -> bool:
+        """Sliding-window ceiling on /api/chat (see _CHAT_MAX_PER_MIN). Same shape and the same
+        reasoning as _preview_over_rate: checked before the body is read, so a 429 costs no tokens."""
+        now = time.time()
+        with _RATE_LOCK:
+            _chat_hits[:] = [t for t in _chat_hits if now - t < 60]
+            _chat_hits.append(now)
+            return len(_chat_hits) > _CHAT_MAX_PER_MIN
+
+    def _handle_chat(self) -> None:
+        """One turn of the operator talking to Bean about her notebook.
+
+        Reads nothing and writes nothing. The reply is either an ANSWER (a read of her notebook,
+        with the lines it leaned on) or a PROPOSAL she has to confirm — and confirming goes through
+        the existing single notebook writer (PUT /api/notebook, ETag-guarded), not through here.
+        That separation is the point: this endpoint cannot change her brain even if it wanted to.
+        """
+        if self._chat_over_rate():
+            log.warning("chat over %d/min — 429", _CHAT_MAX_PER_MIN)
+            return self._send_json(429, {"error": "rate limited — slow down a moment"})
+        try:
+            data = self._read_json()
+        except json.JSONDecodeError as exc:
+            return self._send_json(400, {"error": f"invalid JSON: {exc}"})
+        if not isinstance(data, dict):
+            return self._send_json(400, {"error": "expected an object"})
+        message = str(data.get("message") or "").strip()
+        if not message:
+            return self._send_json(400, {"error": "missing 'message'"})
+        if len(message) > _CHAT_MAX_CHARS:
+            return self._send_json(413, {"error": "that message is too long for me to hold"})
+        transcript = data.get("transcript")
+        if not isinstance(transcript, list):
+            transcript = []
+
+        notebook = self._load_notebook_or_503()
+        if notebook is None:
+            return  # nothing to talk ABOUT yet — the notebook is the whole subject of this endpoint
+        try:
+            # about_path is read HERE and nowhere else — the engine never sees it, which is the
+            # whole point of keeping it off the notebook (see paths.about_path).
+            out = chat.reply(
+                notebook, message, transcript, ModelAdapter(DRAFT_MODEL, customer=CUSTOMER),
+                about=chat.load_about(about_path(CUSTOMER)),
+            )
+        except OutOfCreditsError:
+            raise  # do_POST answers 402 "top up", same as every other spending route
+        except Exception as exc:  # noqa: BLE001 - a model/network failure must not 500 the app
+            log.warning("chat turn failed: %s", exc)
+            return self._send_json(502, {"error": "Bean couldn't reach its brain just now — try again in a moment."})
+        return self._send_json(200, out.to_dict())
 
     def _handle_preview(self) -> None:
         if self._preview_over_rate():
@@ -1607,7 +2104,7 @@ class BeanHandler(SimpleHTTPRequestHandler):
         # `gate` alias so offline tests monkeypatch it like the triage seams.
         if not data.get("skipGate"):
             try:
-                g = gate(email, rules=config.gate)
+                g = gate(email, rules=config.gate, customer=CUSTOMER)
             except OutOfCreditsError:
                 raise  # do_POST answers 402 "top up", not the generic 502 below
             except Exception as exc:  # noqa: BLE001 - a model/network failure must not 500 the preview
@@ -1792,7 +2289,7 @@ class BeanHandler(SimpleHTTPRequestHandler):
         # webhook thread with no HTTP response — Bean's own doctrine (never 500; refuse loudly so
         # Postmark retries) is followed one paragraph above by _load_config_or_503 and must hold here.
         try:
-            g = gate(email, rules=config.gate)
+            g = gate(email, rules=config.gate, customer=CUSTOMER)
         except OutOfCreditsError:
             raise  # do_POST → 402; non-2xx, so Postmark retries once topped up
         except Exception as exc:  # noqa: BLE001 - delay the mail (Postmark retries), never crash the webhook
@@ -1862,8 +2359,20 @@ class BeanHandler(SimpleHTTPRequestHandler):
         corrections = self._load_corrections_or_503()
         if corrections is None:
             return
+        # Does this land in a conversation someone is already waiting on? If so ONE draft answers
+        # the whole thing, because she sends one reply and reading three near-duplicate drafts to
+        # write it is the work Bean is supposed to remove. Read outside _STATE_LOCK alongside the
+        # model call; the siblings are re-read under the lock before anything is written.
+        siblings = _open_siblings_of(email, payload)
+        conversation_block = ""
+        if siblings:
+            conv = conversation.build(
+                siblings + [_as_inbox_dict(email, payload, reply_to, {})],
+                _read_status(status_path(CUSTOMER)),
+            )
+            conversation_block = conversation.render_for_prompt(conv)
         try:
-            result, result_d = _run_engine(email, config, corrections)
+            result, result_d = _run_engine(email, config, corrections, conversation=conversation_block or None)
         except OutOfCreditsError:
             raise  # do_POST → 402; non-2xx, so Postmark retries once topped up
         except Exception as exc:  # noqa: BLE001 - delay the mail (Postmark retries), never crash the webhook
@@ -1880,6 +2389,8 @@ class BeanHandler(SimpleHTTPRequestHandler):
         # would be clobbered by the replace, losing a real customer email.
         with _STATE_LOCK:
             append_inbox(item, path=inbox_path(CUSTOMER))
+            if conversation_block:
+                _roll_siblings_into(email.id)
         _stamp_inbound()
         return self._send_json(200, {"ok": True, "disposition": "reply", "email_id": email.id})
 

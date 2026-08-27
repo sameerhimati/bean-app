@@ -45,6 +45,7 @@ from bean.contract import Confidence, Grounding
 from bean.engine import DRAFT_TOOL, draft_email
 from bean.fixtures import GOLDEN
 from bean.llm import DRAFT_MODEL, FakeModel
+from bean.shelf import Exemplar
 
 # The tree spoke HIGH/LOW/FLAG; the notebook engine speaks GREEN/YELLOW/RED. The goldens are still
 # written in the first vocabulary because that is what a golden case ASSERTS — the expectation, not
@@ -241,6 +242,13 @@ def test_the_floor_does_not_licence_a_yes_man():
         "bucket": "Order Status", "draft": "Absolutely, all set!",
         "citations": ["notebook:Order Status"], "confidence": "green", "why_unsure": [],
     }})
-    results = [(c, draft_email(notebook, [], [], None, c.email, model)) for c in GOLDEN]
+    # A NEIGHBOUR is supplied deliberately. Without one the engine's empty-shelf rule now caps every
+    # draft at yellow, so this yes-man could never produce a green and the gate under test would
+    # never fire — the test would pass while measuring nothing. Giving it grounding is what keeps
+    # this an honest test OF THE GATE. (That the rule defuses a yes-man on its own is the point of
+    # the rule; it is pinned in tests/test_engine.py, not here.)
+    shelf = [Exemplar(email_id="past", subject="s", body="b", reply="her past reply",
+                      bucket=None, score=0.9)]
+    results = [(c, draft_email(notebook, shelf, [], None, c.email, model)) for c in GOLDEN]
     with pytest.raises(AssertionError, match="should not be green"):
         _overconfidence_gate(results)

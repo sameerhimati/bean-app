@@ -211,7 +211,7 @@ function KnowledgeSection({ config, setConfig }) {
   return React.createElement('div', { className: 'admin-section' },
     React.createElement('div', { className: 'admin-section-head' },
       React.createElement('div', null,
-        React.createElement('h2', null, 'Knowledge & policy'),
+        React.createElement('h2', null, 'What me know'),
         React.createElement('p', null, 'The facts Bean grounds every reply in. No source, no claim — that’s the rule.')
       ),
       React.createElement('button', { className: 'admin-add-btn', onClick: add }, '+ Add doc')
@@ -247,7 +247,7 @@ function SettingsSection({ config, setConfig }) {
   return React.createElement('div', { className: 'admin-section' },
     React.createElement('div', { className: 'admin-section-head' },
       React.createElement('div', null,
-        React.createElement('h2', null, 'Settings'),
+        React.createElement('h2', null, 'Me connections'),
         React.createElement('p', null, 'Connections that let Bean point you at the source of truth.')
       )
     ),
@@ -321,20 +321,186 @@ function LearnedSection() {
       h('div', { style: { fontSize: 12, color: 'var(--ink-faint)', marginTop: 2 } },
         r.category + (r.relabeled ? ' · you moved it from “' + r.model_category + '”' : '')),
       r.note ? h('div', { style: { fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 6, fontStyle: 'italic' } }, '💬 ' + r.note) : null,
-      r.final_text ? h('div', { style: { fontSize: 12.5, color: 'var(--ink-soft)', background: 'var(--cream-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', marginTop: 8, whiteSpace: 'pre-wrap' } }, r.final_text) : null));
+      // Clamped, not truncated — the whole reply is there, it just doesn't cost the page. These
+      // rendered in full, so eight corrections was a very long scroll to see eight rows. Same
+      // collapse-with-a-peek idiom as the thread messages in the draft view, so it is one
+      // vocabulary rather than a second one.
+      r.final_text ? h('details', { className: 'admin-clamp' },
+        h('summary', null, h('span', { className: 'admin-clamp-peek' }, r.final_text)),
+        h('div', { className: 'admin-clamp-full' }, r.final_text)) : null));
 
   return h('div', { className: 'admin-section' }, head, summary, h('div', null, rows.map(rowEl)));
 }
 window.LearnedSection = LearnedSection;
 
-function AdminView({ config, setConfig, onBack }) {
-  const [tab, setTab] = useAdminState('scope');
-  const NAV = [['scope', 'What me handle'], ['learned', 'What me learned'], ['kb', 'Knowledge & policy'], ['set', 'Settings']];
+// ---- What me changed ----
+// Every edit ever made to her notebook, newest first. Read-only; GET /api/notebook/history.
+//
+// Deliberately NOT the same thing as "What me learned" next door, and the names have to keep them
+// apart: that one is feedback on DRAFTS, this one is edits to the BRAIN those drafts come from.
+//
+// This is also where the before/after finally becomes visible. We chose not to put a strikethrough
+// diff on the ProposalCard, because at the moment of deciding, the question is "is this right?" —
+// not "what did it replace?". Afterwards the opposite is true, so the old text belongs here, where
+// it is a record rather than a decision.
+function ChangedSection() {
+  const h = React.createElement;
+  const [data, setData] = useAdminState(null);
+  React.useEffect(() => { window.beanStore.loadNotebookHistory().then(setData); }, []);
+
+  const head = h('div', { className: 'admin-section-head' },
+    h('div', null,
+      h('h2', null, 'What me changed'),
+      h('p', null, 'Every edit to me notebook — what it was before, what it is now, and whether you told me in chat or wrote it yourself.')));
+
+  if (data === null) return h('div', { className: 'admin-section' }, head,
+    h('div', { className: 'tree-flat-empty' },
+      h(window.BeanRoast, { size: 24, mode: 'roast', style: { display: 'inline-block', verticalAlign: 'middle', marginRight: 8 } }),
+      'Loading…'));
+
+  const rows = data.changes || [];
+  if (!rows.length) return h('div', { className: 'admin-section' }, head,
+    h('div', { className: 'tree-flat-empty' }, 'Nothing yet — me notebook is exactly as you left it.'));
+
+  const ACT = {
+    added: ['ADDED', '#2E7D3E', '#EAF6EC', '#BFE3C6'],
+    changed: ['CHANGED', '#9A6A12', '#FBF1DA', '#EAD6A2'],
+    removed: ['REMOVED', '#9A4B2E', '#FBE9DF', '#F0CDB9'],
+  };
+  const chip = (text, color, bg, border) => h('span', {
+    style: { fontSize: 10.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.3px',
+      padding: '3px 9px', borderRadius: 999, color, background: bg, border: '1px solid ' + border } }, text);
+
+  // The old line struck through above the new one. The only place in the app that renders a diff,
+  // and it earns it: this row exists to show what was replaced.
+  // Long lines clamp rather than truncate — one of her facts is a whole paragraph about the store,
+  // and struck through at full length it buries the line that replaced it. The text is never cut:
+  // the rest is one click away, because hiding what was replaced would defeat the record.
+  const line = (text, struck) => {
+    const style = { fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap', padding: '7px 10px',
+      borderRadius: 8, marginTop: 6,
+      color: struck ? '#A99C86' : 'var(--ink-soft)',
+      textDecoration: struck ? 'line-through' : 'none',
+      background: struck ? 'var(--paper)' : 'var(--cream-2)',
+      border: '1px solid ' + (struck ? 'var(--line-soft)' : 'var(--line)') };
+    if (String(text).length <= 220) return h('div', { style }, text);
+    return h('details', { className: 'admin-clamp', style: { marginTop: 6 } },
+      h('summary', { style: { ...style, marginTop: 0 } },
+        h('span', { className: 'admin-clamp-peek' }, text)),
+      h('div', { style: { ...style, marginTop: 0 } }, text));
+  };
+
+  const rowEl = (r, i) => {
+    const [label, color, bg, border] = ACT[r.action] || ['EDITED', 'var(--ink-soft)', 'var(--cream-2)', 'var(--line)'];
+    return h('div', { key: i, className: 'admin-card', style: { marginBottom: 10 } },
+      h('div', { className: 'admin-card-body', style: { display: 'block' } },
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 7 } },
+          chip(label, color, bg, border),
+          h('span', { style: { fontSize: 12, fontWeight: 700, color: 'var(--ink)' } }, r.section),
+          r.label ? h('span', { style: { fontSize: 12, color: 'var(--ink-faint)' } }, '· ' + r.label) : null,
+          h('span', { style: { flex: 1 } }),
+          // Who made the change. "you told me" is Bean's existing word for `stated` provenance —
+          // one vocabulary, so the same idea never has two names.
+          h('span', { style: { fontSize: 11.5, color: 'var(--ink-faint)', fontStyle: 'italic' } },
+            r.source === 'chat' ? 'you told me in chat' : 'you wrote it'),
+          h('span', { style: { fontSize: 11.5, color: 'var(--ink-faint)' } }, window.beanTimeLabel(r.ts) || r.ts)),
+        r.before ? line(r.before, true) : null,
+        r.after ? line(r.after, false) : null));
+  };
+
+  return h('div', { className: 'admin-section' }, head,
+    h('div', { className: 'admin-label', style: { margin: '4px 0 12px' } },
+      rows.length + (rows.length === 1 ? ' change' : ' changes') + ' to me notebook'),
+    h('div', null, rows.map(rowEl)));
+}
+window.ChangedSection = ChangedSection;
+
+// ---- What me can do now ----
+// What changed in BEAN, the software. Read-only; reads the static web/whats-new.json.
+//
+// ⚠️ NOT the same thing as "What me changed" above, and the two names have to hold them apart:
+// that one is what changed in HER NOTEBOOK, this is what changed in the product. Same word,
+// different subject, and confusing them would make both useless.
+//
+// It exists because features kept appearing underneath her — a chat panel, conversation cards, a
+// coffee animation — with nothing anywhere saying what they were. Software that changes silently is
+// software you stop trusting to be the same tomorrow.
+// "Aug 16" from a plain 2026-08-16, formatted from the STRING rather than through a Date.
+//
+// beanTimeLabel reads an ISO date as UTC midnight and renders it in her timezone, which walks a
+// date-only entry back to the previous evening — "Aug 15, 7:00 PM" for something dated the 16th.
+// A release note has no time of day, so it should not be given one, and certainly not the wrong day.
+const _MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function releaseDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return String(iso || '');
+  return _MONTHS[+m[2] - 1] + ' ' + (+m[3]) + ', ' + m[1];
+}
+
+function WhatsNewSection({ onSeen }) {
+  const h = React.createElement;
+  const [rows, setRows] = useAdminState(null);
+  React.useEffect(() => {
+    window.beanStore.loadWhatsNew().then(list => {
+      setRows(list);
+      // Opening the page IS reading it — clear the dot rather than making her dismiss anything.
+      window.beanStore.markWhatsNewSeen(list);
+      if (onSeen) onSeen();
+    });
+  }, []);
+
+  const head = h('div', { className: 'admin-section-head' },
+    h('div', null,
+      h('h2', null, 'What me can do now'),
+      h('p', null, 'New things me learned to do, newest first. Me will keep this up to date so nothing shows up in your inbox without an explanation.')));
+
+  if (rows === null) return h('div', { className: 'admin-section' }, head,
+    h('div', { className: 'tree-flat-empty' },
+      h(window.BeanRoast, { size: 24, mode: 'roast', style: { display: 'inline-block', verticalAlign: 'middle', marginRight: 8 } }),
+      'Loading…'));
+
+  if (!rows.length) return h('div', { className: 'admin-section' }, head,
+    h('div', { className: 'tree-flat-empty' }, 'Nothing new yet.'));
+
+  const rowEl = (r, i) => h('div', { key: i, className: 'admin-card', style: { marginBottom: 10 } },
+    h('div', { className: 'admin-card-body', style: { display: 'block' } },
+      h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 5 } },
+        h('div', { style: { fontSize: 14, fontWeight: 800, color: 'var(--ink)' } }, r.title),
+        h('span', { style: { flex: 1 } }),
+        h('span', { style: { fontSize: 11.5, color: 'var(--ink-faint)' } }, releaseDate(r.date))),
+      h('div', { style: { fontSize: 13, lineHeight: 1.6, color: 'var(--ink-soft)', textWrap: 'pretty' } }, r.body),
+      // Where to actually look. A feature she cannot find is a feature she does not have.
+      r.where ? h('div', {
+        style: { display: 'inline-block', marginTop: 9, fontSize: 11.5, fontWeight: 700,
+          color: 'var(--bean)', background: '#f1e7d6', border: '1px solid #e2d0b6',
+          borderRadius: 999, padding: '3px 10px' },
+      }, '→ ' + r.where) : null));
+
+  return h('div', { className: 'admin-section' }, head, h('div', null, rows.map(rowEl)));
+}
+window.WhatsNewSection = WhatsNewSection;
+
+function AdminView({ config, setConfig, onBack, onWhatsNewSeen, whatsNew }) {
+  // Land on the release notes when there is an unread one. The dot on ⚙ Settings is a promise that
+  // there is something new to read; opening onto "What me handle" instead would leave the notes
+  // unread, the dot uncleared, and the promise unkept — which is the whole feature failing quietly.
+  const [tab, setTab] = useAdminState(whatsNew ? 'new' : 'scope');
+  // One voice, and no item sharing a name with the page it sits inside. It used to be a nav titled
+  // "Settings" containing an item also called "Settings", with half the labels in Bean's voice and
+  // half not — so the sidebar read as two vocabularies and the nesting was a small riddle.
+  const NAV = [
+    ['new', 'What me can do now'],
+    ['scope', 'What me handle'],
+    ['learned', 'What me learned'],
+    ['changed', 'What me changed'],
+    ['kb', 'What me know'],
+    ['set', 'Me connections'],
+  ];
   return React.createElement('div', { className: 'admin-view' },
     React.createElement('button', { className: 'back-btn', onClick: onBack }, '← inbox'),
     React.createElement('div', { className: 'admin-shell' },
       React.createElement('nav', { className: 'admin-nav' },
-        React.createElement('div', { className: 'admin-nav-title' }, 'Settings'),
+        React.createElement('div', { className: 'admin-nav-title' }, 'Bean'),
         NAV.map(([k, label]) => React.createElement('button', {
           key: k, className: 'admin-nav-btn' + (tab === k ? ' is-active' : ''), onClick: () => setTab(k),
         }, label))
@@ -342,6 +508,8 @@ function AdminView({ config, setConfig, onBack }) {
       React.createElement('div', { className: 'admin-body' },
         tab === 'scope' && React.createElement(ScopeSection, { config, setConfig }),
         tab === 'learned' && React.createElement(LearnedSection, null),
+        tab === 'new' && React.createElement(WhatsNewSection, { onSeen: onWhatsNewSeen }),
+        tab === 'changed' && React.createElement(ChangedSection, null),
         tab === 'kb' && React.createElement(KnowledgeSection, { config, setConfig }),
         tab === 'set' && React.createElement(SettingsSection, { config, setConfig })
       )

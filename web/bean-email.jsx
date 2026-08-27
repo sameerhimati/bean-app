@@ -73,6 +73,18 @@ function EmailBody({ text, className }) {
   );
 }
 
-if (typeof window !== 'undefined') { Object.assign(window, { EmailBody, linkifyText, tokenizeEmailText }); }
+// How many real messages this email is: the quoted history plus the one in hand.
+//
+// `email.conversation` comes from bean/quoting.py, which unpacks the stored `thread` blob into the
+// messages actually inside it. The `thread.length + 1` fallback is only for the baked fixtures in
+// bean-data.jsx, which carry a hand-written array and no `conversation` — on real mail `thread` is
+// always exactly one element, so that expression could only ever say "2".
+function msgCount(email) {
+  if (!email) return 1;
+  if (email.conversation && email.conversation.length) return email.conversation.length + 1;
+  return ((email.thread && email.thread.length) || 0) + 1;
+}
+
+if (typeof window !== 'undefined') { Object.assign(window, { EmailBody, linkifyText, tokenizeEmailText, msgCount }); }
 // Also reachable under node (no window) for a quick pure-function sanity check — harmless in browser.
 if (typeof module !== 'undefined' && module.exports) { module.exports = { tokenizeEmailText }; }

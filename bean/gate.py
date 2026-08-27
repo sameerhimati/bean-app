@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from bean import quoting
 from bean.llm import CLASSIFY_MODEL, Model, live_model
 
 GATE_TOOL = {
@@ -114,8 +115,13 @@ class GateResult:
 
 def gate_user(email) -> str:
     parts = [f"FROM: {email.sender_name} <{email.sender_email}>", f"SUBJECT: {email.subject}", "", email.body]
-    if getattr(email, "thread", None):
-        parts += ["", "--- earlier in this thread (oldest→newest) ---", *email.thread]
+    # Same fix as engine._user_message: the stored `thread` is one raw quoted blob, which is
+    # newest-first-nested — the opposite of what this header promises. quoting unpacks it.
+    prior = quoting.thread_for_prompt(
+        getattr(email, "thread", None), email.sender_email, email.sender_name
+    )
+    if prior:
+        parts += ["", "--- earlier in this thread (oldest→newest) ---", *prior]
     return "\n".join(parts)
 
 
@@ -125,15 +131,19 @@ def _match_rule(email, patterns: list[str]) -> str | None:
     return next((p for p in patterns if p and p.lower() in hay), None)
 
 
-def needs_reply(email, *, model: Model | None = None, rules: dict | None = None) -> GateResult:
-    """Gate one email. `rules` is Config.gate ({'alwaysReply': [...], 'alwaysFile': [...]})."""
+def needs_reply(email, *, model: Model | None = None, rules: dict | None = None,
+                customer: str | None = None) -> GateResult:
+    """Gate one email. `rules` is Config.gate ({'alwaysReply': [...], 'alwaysFile': [...]}).
+
+    `customer` only decides whose usage log this call's tokens land on (llm._log_usage); it is
+    ignored when an explicit `model` is injected, since that model already knows its own tenant."""
     rules = rules or {}
     if hit := _match_rule(email, rules.get("alwaysReply", [])):
         return GateResult("reply", "rule", f"Matches your always-reply rule “{hit}”.")
     if hit := _match_rule(email, rules.get("alwaysFile", [])):
         return GateResult("file", "rule", f"Matches your always-file rule “{hit}”.")
 
-    model = model or live_model(CLASSIFY_MODEL)
+    model = model or live_model(CLASSIFY_MODEL, customer)
     data = model.structured(
         system=[{"type": "text", "text": GATE_SYSTEM}], user=gate_user(email), tool=GATE_TOOL,
         max_tokens=300,

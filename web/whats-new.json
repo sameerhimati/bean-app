@@ -1,0 +1,55 @@
+{
+  "_comment": [
+    "What changed in BEAN — the product — written for the operator, newest first.",
+    "",
+    "⚠️ HAND-WRITTEN, never generated from commits. 'feat(chat): tell Bean a policy changed' is",
+    "written for a reviewer; she needs 'You can now tell me when a policy changes.' Generating this",
+    "would fill her screen with vocabulary that is not hers — the same internal-vocabulary-in-her-face",
+    "problem humanize_macro_names exists to undo.",
+    "",
+    "This ships IN THE REPO, unlike about.md: it describes the code, carries no customer data, and",
+    "every tenant should see the same list.",
+    "",
+    "`date` is ISO and is what the unread dot compares against — keep them sortable.",
+    "`where` is optional and should name something she can actually see on screen.",
+    "Write in Bean's voice. One entry per thing she would notice; skip anything she would not."
+  ],
+  "entries": [
+    {
+      "date": "2026-08-19",
+      "title": "Clear an email without opening it",
+      "body": "If you already answered someone in your own mail, or you just don't want me on it, press Clear on the row — it goes to Handled and me never asks again. Me learns nothing from a Clear; it is tidying, not you telling me me was wrong. When the Handled pile gets long, one more press clears the lot. Snoozed mail stays put.",
+      "where": "The Clear on any inbox row, and “Clear N handled” at the bottom"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "Press me and me go to the Beanary",
+      "body": "Press the bean up in the corner — or the big one on your inbox — and me will roast, grind and pour a whole cup for you. Me does nothing useful while this happens. That is the point.",
+      "where": "The bean in the top-left"
+    },
+    {
+      "date": "2026-08-15",
+      "title": "Tell me when something changes",
+      "body": "There is a bean in the bottom-left corner now. Press it and tell me things like “the return window is 60 days now” — me works out what in your notebook that touches and shows you the exact line before me writes anything. You confirm, you fix it, or you say no. Me never writes on my own.",
+      "where": "The bean in the bottom-left"
+    },
+    {
+      "date": "2026-08-15",
+      "title": "Me keeps a record of what changed in my notebook",
+      "body": "Every edit to my notebook is written down — what the line said before, what it says now, and whether you told me in chat or typed it yourself. So you never have to take my word for what me changed.",
+      "where": "Settings → What me changed"
+    },
+    {
+      "date": "2026-08-14",
+      "title": "One reply when someone writes three times",
+      "body": "When a customer writes again before you have answered, me now puts their messages together as one thing to deal with and writes ONE reply that answers all of it — instead of three drafts you have to read to send one email. You had 13 of those waiting.",
+      "where": "Your inbox — look for “wrote 3× · no reply”"
+    },
+    {
+      "date": "2026-08-14",
+      "title": "Me can read a long email chain properly now",
+      "body": "Me used to squash a whole back-and-forth into one wall of quoted text and call it “1 message”. Some of those chains had thirteen. Me now reads them as separate messages, oldest first, with who said what — so me understands the conversation, and so do you.",
+      "where": "Any email with “↩ 4 msgs” next to it"
+    }
+  ]
+}

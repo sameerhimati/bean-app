@@ -40,7 +40,7 @@ def test_fake_model_does_not_write_usage(tmp_path, monkeypatch):
 
 def test_log_usage_is_non_fatal(tmp_path, monkeypatch):
     # A logging failure must never propagate — a broken path is swallowed, not raised.
-    def boom() -> None:
+    def boom(customer=None) -> None:
         raise OSError("volume gone")
 
     monkeypatch.setattr(llm, "usage_path", boom)
@@ -60,3 +60,20 @@ def test_log_usage_records_cache_writes_not_just_reads(tmp_path, monkeypatch):
     assert line["cache_write"] == 2262, "a cache write must be visible, or 0% hit rate is unexplainable"
     assert line["cache_read"] == 0
     assert line["input_tokens"] == 120
+
+
+def test_cache_ttl_is_recorded_so_the_write_can_be_priced(tmp_path, monkeypatch):
+    """The response never says which TTL a write used — only the request knew. Without this field
+    bean/usage.py has to assume one rate for the whole log, and the log now holds both: ~1,600
+    historical writes billed at 1.25x and every new one at 2.0x."""
+    monkeypatch.setenv("BEAN_DATA_DIR", str(tmp_path))
+    _log_usage("claude-sonnet-4-6", Usage(cache_creation_input_tokens=2262), "draft", None, "1h")
+    assert json.loads(usage_path().read_text())["cache_ttl"] == "1h"
+
+
+def test_a_line_with_no_ttl_stays_absent_rather_than_guessing(tmp_path, monkeypatch):
+    """An uncached call writes no cache, so stamping a TTL on it would price a write that never
+    happened. Absence is also what every pre-existing line looks like, and it means 5-minute."""
+    monkeypatch.setenv("BEAN_DATA_DIR", str(tmp_path))
+    _log_usage("claude-sonnet-4-6", Usage(input_tokens=10), "draft")
+    assert "cache_ttl" not in json.loads(usage_path().read_text())

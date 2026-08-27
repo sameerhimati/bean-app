@@ -51,18 +51,306 @@
   @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
   .bean-bob { animation: bob 2.6s ease-in-out infinite; }
 
+  /* The Beanary — the mark, pressable. A bare button wrapper: no chrome, no hover fill, nothing to
+     suggest a control, because the point is that it looks exactly like the mark did before. The
+     only affordances are the cursor and a focus ring for keyboard reach. */
+  .beanary-btn {
+    display: inline-flex; padding: 0; margin: 0; border: none; background: none;
+    cursor: pointer; line-height: 0; border-radius: 999px; flex: none;
+  }
+  .beanary-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px #e7d9c2; }
+
+  /* ---------- Bean roast (thinking mark) ----------
+     mode-brew (default, ~6s) is the full journey: bean → roast → grind → pour-over → cup.
+     mode-roast (2.4s) is the compact bean-only loop for 20–28px inline slots.
+     Palette is variables, so tone-light swaps every colour without duplicating a keyframe. */
+
+  .bean-roast {
+    display: block; flex: none; overflow: visible;
+    --r1: #C9BE9A;  /* raw / green */
+    --r2: #B98A53;  /* drying */
+    --r3: #8E5A32;  /* first crack */
+    --r4: #6E4327;  /* --bean, resting colour */
+    --r5: #4A2A18;  /* dark roast */
+    --coffee: #3A2012;
+    --cup: #D8B48C;
+    --water: #C7BCA8;
+    --heat-1: #E0A92E;
+    --heat-2: #E8A87C;
+  }
+  /* On the ink-coloured toast the paper palette disappears; this lifts the whole ramp. */
+  .bean-roast.tone-light {
+    --r1: #F0E6C8; --r2: #E2BE8A; --r3: #D8A46E; --r4: #D8B48C; --r5: #B9895F;
+    --coffee: #A8703F; --cup: #EFE0C6; --water: #9A8F7E;
+  }
+
+  .bean-roast .br-h1 { stop-color: var(--heat-1); }
+  .bean-roast .br-h2 { stop-color: var(--heat-2); }
+  .bean-roast .br-fl-o { fill: var(--heat-1); opacity: .92; }
+  .bean-roast .br-fl-i { fill: #F5DEA6; opacity: .9; }
+
+  .bean-roast .br-body { fill: var(--r4); }
+  .bean-roast .br-sheen { fill: #ffffff; opacity: .20; }
+  .bean-roast .br-specks circle { fill: var(--r5); }
+  .bean-roast .br-bed { fill: var(--r5); }
+  .bean-roast .br-dripper path { fill: none; stroke: var(--r4); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+  .bean-roast .br-stream { fill: var(--water); }
+  .bean-roast .br-cup-body { fill: var(--cup); }
+  .bean-roast .br-cup-handle { fill: none; stroke: var(--cup); stroke-width: 7; stroke-linecap: round; }
+  .bean-roast .br-brew { fill: var(--coffee); }
+  .bean-roast .br-steam path { fill: none; stroke: var(--water); stroke-width: 5; stroke-linecap: round; }
+
+  .bean-roast .br-swell,
+  .bean-roast .br-judder,
+  .bean-roast .br-sheen,
+  .bean-roast .br-heat,
+  .bean-roast .br-specks,
+  .bean-roast .br-bed,
+  .bean-roast .br-dripper,
+  .bean-roast .br-cup,
+  .bean-roast .br-steam { transform-box: fill-box; transform-origin: center; }
+  .bean-roast .br-bed { transform-origin: bottom; }
+  .bean-roast .br-stream { transform-box: fill-box; transform-origin: top; }
+  .bean-roast .br-brew { transform-box: fill-box; transform-origin: bottom; }
+  .bean-roast .br-flicker { transform-box: fill-box; transform-origin: bottom; }
+
+  .bean-roast .br-heat,
+  .bean-roast .br-specks,
+  .bean-roast .br-bed,
+  .bean-roast .br-dripper,
+  .bean-roast .br-stream,
+  .bean-roast .br-cup,
+  .bean-roast .br-steam { opacity: 0; }
+
+  /* ---- compact loop: the bean roasts, nothing else ---- */
+  .bean-roast.mode-roast { --roast-dur: 2.4s; }
+  .bean-roast.mode-roast.is-on .br-body  { animation: bean-roast-fill  var(--roast-dur, 2.4s) ease-in-out infinite; }
+  .bean-roast.mode-roast.is-on .br-swell { animation: bean-roast-swell var(--roast-dur, 2.4s) ease-in-out infinite; }
+  .bean-roast.mode-roast.is-on .br-sheen { animation: bean-roast-sheen var(--roast-dur, 2.4s) ease-in-out infinite; }
+  .bean-roast.mode-roast.is-on .br-heat  { animation: bean-roast-heat  var(--roast-dur, 2.4s) ease-in-out infinite; }
+
+  /* Starts and ends at the RESTING colour, and only ever gets darker in between.
+     It used to open on raw grey (--r1) because the story is raw → roasted. At 64px across six
+     seconds that reads as a journey; at 20–28px across two it reads as the bean grEYING OUT —
+     a dark mark suddenly going pale is the universal look of "disabled", so pressing Bean seemed
+     to break him. The raw→cup narrative belongs to mode-brew, which has the room to tell it. */
+  @keyframes bean-roast-fill {
+    0%   { fill: var(--r4); }
+    30%  { fill: var(--r3); }
+    62%, 78% { fill: var(--r5); }
+    100% { fill: var(--r4); }
+  }
+  /* A breath, not a disappearance. The old 93% keyframe dipped to .55 opacity — the "bean drops
+     out, fresh bean drops in" beat, which only made sense while the loop restarted from raw. With
+     the loop now returning to its resting colour there is nothing to swap out, so that dip was
+     just a flicker at the end of every cycle. */
+  @keyframes bean-roast-swell {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    44% { transform: scale(1.04); opacity: 1; }
+    72% { transform: scale(.99); opacity: 1; }
+  }
+  @keyframes bean-roast-sheen {
+    0%   { opacity: .11; transform: scale(1.22); }
+    44%  { opacity: .20; transform: scale(1); }
+    82%  { opacity: .62; transform: scale(.52); }
+    93%  { opacity: .30; transform: scale(.70); }
+    100% { opacity: .11; transform: scale(1.22); }
+  }
+  @keyframes bean-roast-heat {
+    0%   { opacity: 0;   transform: scale(.62); }
+    30%  { opacity: .34; transform: scale(.86); }
+    58%  { opacity: .72; transform: scale(1.04); }
+    82%  { opacity: .88; transform: scale(1.12); }
+    93%  { opacity: .16; transform: scale(.92); }
+    100% { opacity: 0;   transform: scale(.62); }
+  }
+
+  /* ---- the journey: one loop = one cup ----
+     0–12 raw · 12–34 roast · 34–42 grind · 40–52 bed + dripper · 52–72 pour
+     72–80 handoff · 76–92 cup fills · 86–98 steam · 94–100 fresh bean */
+  .bean-roast.mode-brew { --roast-dur: 6s; }
+  .bean-roast.mode-brew.is-on .br-body    { animation: bean-brew-fill    var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-swell   { animation: bean-brew-bean    var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-judder  { animation: bean-brew-judder  var(--roast-dur, 6s) linear infinite; }
+  .bean-roast.mode-brew.is-on .br-sheen   { animation: bean-brew-sheen   var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-heat    { animation: bean-brew-heat    var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-specks  { animation: bean-brew-specks  var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-bed     { animation: bean-brew-bed     var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-dripper { animation: bean-brew-dripper var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-stream  { animation: bean-brew-stream  var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-cup     { animation: bean-brew-cup     var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-brew    { animation: bean-brew-fill-up var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-steam   { animation: bean-brew-steam   var(--roast-dur, 6s) ease-in-out infinite; }
+  .bean-roast.mode-brew.is-on .br-flicker { animation: bean-roast-flicker .42s ease-in-out infinite; }
+
+  @keyframes bean-brew-fill {
+    0%, 12% { fill: var(--r1); }
+    18% { fill: var(--r2); }
+    25% { fill: var(--r3); }
+    30% { fill: var(--r4); }
+    36%, 96% { fill: var(--r5); }
+    100% { fill: var(--r1); }
+  }
+  @keyframes bean-brew-bean {
+    0%   { opacity: 1; transform: scale(1); }
+    32%  { opacity: 1; transform: scale(1.03); }
+    37%  { opacity: 1; transform: scale(1); }
+    42%  { opacity: 0; transform: scale(.5); }
+    93%  { opacity: 0; transform: scale(.8); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  /* The grinder judder — the only hard, mechanical motion in the loop, so the break reads as
+     something done TO the bean rather than the bean politely shrinking. */
+  @keyframes bean-brew-judder {
+    0%, 33%, 41%, 100% { transform: rotate(0deg); }
+    35% { transform: rotate(-5deg); }
+    37% { transform: rotate(5deg); }
+    39% { transform: rotate(-3deg); }
+  }
+  @keyframes bean-brew-sheen {
+    0%   { opacity: .11; transform: scale(1.22); }
+    25%  { opacity: .20; transform: scale(1); }
+    36%  { opacity: .62; transform: scale(.52); }
+    42%, 96% { opacity: 0; transform: scale(.5); }
+    100% { opacity: .11; transform: scale(1.22); }
+  }
+  @keyframes bean-brew-heat {
+    0%   { opacity: 0;   transform: scale(.62); }
+    18%  { opacity: .34; transform: scale(.88); }
+    30%  { opacity: .74; transform: scale(1.08); }
+    36%  { opacity: .88; transform: scale(1.12); }
+    46%, 100% { opacity: 0; transform: scale(.7); }
+  }
+  @keyframes bean-brew-specks {
+    0%, 34% { opacity: 0; transform: translateY(-4px) scale(.6); }
+    38% { opacity: 1; transform: translateY(0) scale(1); }
+    48% { opacity: 1; transform: translateY(18px) scale(.7); }
+    52%, 100% { opacity: 0; transform: translateY(24px) scale(.6); }
+  }
+  @keyframes bean-brew-bed {
+    0%, 38% { opacity: 0; transform: scaleY(.15); fill: var(--r5); }
+    50% { opacity: 1; transform: scaleY(1); fill: var(--r5); }
+    70% { opacity: 1; transform: scaleY(1); fill: var(--coffee); }
+    76% { opacity: 0; transform: scaleY(.9); fill: var(--coffee); }
+    100% { opacity: 0; transform: scaleY(.15); fill: var(--r5); }
+  }
+  @keyframes bean-brew-dripper {
+    0%, 40% { opacity: 0; transform: scale(.86); }
+    50%, 72% { opacity: 1; transform: scale(1); }
+    78%, 100% { opacity: 0; transform: scale(.92); }
+  }
+  @keyframes bean-brew-stream {
+    0%, 52% { opacity: 0; transform: scaleY(0); }
+    58%, 68% { opacity: 1; transform: scaleY(1); }
+    73%, 100% { opacity: 0; transform: scaleY(0); }
+  }
+  @keyframes bean-brew-cup {
+    0%, 72% { opacity: 0; transform: scale(.86); }
+    80%, 92% { opacity: 1; transform: scale(1); }
+    99%, 100% { opacity: 0; transform: scale(.94); }
+  }
+  @keyframes bean-brew-fill-up {
+    0%, 76% { transform: scaleY(0); }
+    92%, 100% { transform: scaleY(1); }
+  }
+  @keyframes bean-brew-steam {
+    0%, 84% { opacity: 0; transform: translateY(4px); }
+    90% { opacity: .85; transform: translateY(-3px); }
+    98%, 100% { opacity: 0; transform: translateY(-11px); }
+  }
+
+  @keyframes bean-roast-flicker {
+    0%, 100% { transform: scaleY(1) scaleX(1); }
+    50%      { transform: scaleY(1.13) scaleX(.94); }
+  }
+
+  /* Reduced motion: a held mid-roast bean (first crack) with a slow low-opacity cross-fade on the
+     heat only. No roast curve, no grind, no pour — the journey is motion, so it is the thing that
+     gets dropped. `.is-static` is the same rendering, forced, for the demo page. */
+  @keyframes bean-roast-hold { 0%, 100% { opacity: .14; } 50% { opacity: .32; } }
+
+  /* `!important` on every animation declaration below, and it is load-bearing rather than lazy.
+     The running rules are `.bean-roast.mode-brew.is-on .br-body` — FOUR classes. A cancelling rule
+     of `.bean-roast.is-static .br-body` is three, and the reduced-motion one is two, so both lost
+     the cascade and the journey kept playing. That is invisible in the static case (the brewkit is
+     hidden and `bean-brew-bean` holds opacity 0 for 42–93% of the loop, so the mark simply vanishes)
+     and it is an accessibility failure in the media-query case: a reader who asked for no motion got
+     the full six seconds of it. Specificity is the wrong lever for an override of last resort. */
+  .bean-roast.is-static .br-body,
+  .bean-roast.is-static .br-swell,
+  .bean-roast.is-static .br-judder,
+  .bean-roast.is-static .br-sheen,
+  .bean-roast.is-static .br-flicker,
+  .bean-roast.is-static .br-brewkit *,
+  .bean-roast.is-static.bean-bob { animation: none !important; }
+  .bean-roast.is-static .br-brewkit { display: none; }
+  .bean-roast.is-static .br-body  { fill: var(--r3); }
+  .bean-roast.is-static .br-swell { transform: scale(1); opacity: 1; }
+  .bean-roast.is-static .br-sheen { opacity: .34; transform: scale(.78); }
+  .bean-roast.is-static .br-heat  { animation: bean-roast-hold 2.4s ease-in-out infinite !important; transform: scale(1); opacity: .22; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bean-roast .br-body,
+    .bean-roast .br-swell,
+    .bean-roast .br-judder,
+    .bean-roast .br-sheen,
+    .bean-roast .br-flicker,
+    .bean-roast .br-brewkit *,
+    .bean-roast.bean-bob { animation: none !important; }
+    .bean-roast.is-on .br-brewkit { display: none; }
+    .bean-roast.is-on .br-body  { fill: var(--r3); }
+    .bean-roast.is-on .br-swell { transform: scale(1); opacity: 1; }
+    .bean-roast.is-on .br-sheen { opacity: .34; transform: scale(.78); }
+    .bean-roast.is-on .br-heat  { animation: bean-roast-hold 2.4s ease-in-out infinite !important; transform: scale(1); opacity: .22; }
+  }
+
   /* ---------- Shell ---------- */
   .app-shell { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+  .app-shell.is-wide { max-width: 1140px; }
   .topbar {
     position: sticky; top: 0; z-index: 30;
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 0 14px; margin-bottom: 8px;
     background: linear-gradient(var(--cream) 70%, rgba(244,238,225,0));
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; flex: none; }
+  /* The wordmark is a link home. Styled to look like exactly what it looked like before — a bare
+     button with no chrome — because a lockup that grows a border is a lockup that reads as a
+     control, and this one should only announce itself on hover. */
+  .brand-home {
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left;
+    border-radius: 8px; transition: opacity .12s;
+  }
+  .brand-home:hover { opacity: .7; }
+  .brand-home:focus-visible { outline: none; box-shadow: 0 0 0 3px #e7d9c2; }
+  /* Same rule as the buttons: the lockup wraps as a unit or not at all. It was breaking into
+     "Bean." over "INBOX TRIAGE" at widths where there was room for both. */
+  .wordmark, .tagline { white-space: nowrap; }
   .wordmark { font-size: 25px; font-weight: 700; letter-spacing: -.5px; line-height: 1; color: var(--ink); }
   .tagline { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--bean); margin-top: 4px; letter-spacing: 3px; }
-  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  /* Two clusters — state, then actions — with a hairline between, so six controls read as two
+     groups rather than one undifferentiated row. Wraps as a row when it must; nothing is hidden
+     behind a menu, because an unreachable destination is a worse problem than a tight row. */
+  .topbar-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .topbar-sep { width: 1px; height: 20px; background: var(--line); flex: none; margin: 0 2px; }
+
+  /* A long reply, clamped rather than truncated — the whole text is one click away. Correction
+     rows rendered in full, so eight of them was a very long scroll to see eight rows. */
+  .admin-clamp { margin-top: 8px; }
+  .admin-clamp > summary {
+    list-style: none; cursor: pointer; font-size: 12.5px; color: var(--ink-soft);
+    background: var(--cream-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  .admin-clamp > summary::-webkit-details-marker { display: none; }
+  .admin-clamp-peek {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; white-space: pre-wrap;
+  }
+  .admin-clamp[open] > summary { display: none; }
+  .admin-clamp-full {
+    font-size: 12.5px; color: var(--ink-soft); background: var(--cream-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap;
+  }
   .proton-pill {
     display: inline-flex; align-items: center; gap: 7px;
     font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
@@ -139,6 +427,107 @@
   .category-select:focus { outline: none; border-color: var(--bean); }
   /* Clear-FYI: a quiet destructive action — legible, not loud, and it lives on the filed lane only. */
   .filed-head { display: flex; align-items: center; gap: 12px; }
+  /* "What me can do now" on the inbox. A card, not a modal — it sits above the greeting and can be
+     scrolled past, which is the whole difference between telling her and interrupting her. */
+  .whatsnew-card {
+    display: flex; gap: 14px; align-items: flex-start; position: relative;
+    background: linear-gradient(180deg, #FFFDF8 0%, var(--cream-2) 100%);
+    border: 1.5px solid #E8D9BE; border-radius: 18px; padding: 16px 44px 16px 16px;
+    margin-bottom: 18px; box-shadow: var(--shadow);
+  }
+  .whatsnew-bean { flex: none; margin-top: 2px; }
+  .whatsnew-body { min-width: 0; }
+  .whatsnew-kicker {
+    font-size: 10.5px; font-weight: 900; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--bean); margin-bottom: 3px;
+  }
+  .whatsnew-card h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 700; }
+  .whatsnew-card p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+  .whatsnew-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .whatsnew-where { font-size: 12px; font-weight: 800; color: var(--ink-faint); }
+  .whatsnew-more {
+    font-family: inherit; font-size: 12px; font-weight: 800; color: var(--bean);
+    background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline;
+  }
+  .whatsnew-more:hover { color: var(--ink); }
+  .whatsnew-x {
+    position: absolute; top: 10px; right: 12px; font-family: inherit; font-size: 18px; line-height: 1;
+    color: var(--ink-faint); background: none; border: none; cursor: pointer; padding: 4px 6px;
+    border-radius: 8px;
+  }
+  .whatsnew-x:hover { color: var(--ink); background: #F0E6D4; }
+
+  /* The Beanary hint — "press me and me does a little roast".
+     ⚠️ THIS BLOCK IS THE FIX FOR A REAL DEFECT, not decoration. bean-root.jsx has rendered
+     `.beanary-hint` since the Beanary shipped, and the class had NO rule anywhere in this file — so
+     the hint fell out of the layout as unstyled black text at the very bottom of the document,
+     under the last card, in the browser default font. It looked like debug output that had escaped,
+     and it has been live for the operator the whole time. The lesson is small and worth keeping:
+     a className in a .jsx file is not a promise that a stylist ever saw it, and nothing in the
+     build fails when the rule is missing — only a screenshot catches it. */
+  /* Stacked ABOVE the chat launcher, not beside it: `.bean-chat-root` is fixed at left 20 / bottom
+     20 with a 50px button, so the obvious corner is already taken and a nub placed there is simply
+     covered by it — which is what the first attempt at this rule did. */
+  .beanary-hint {
+    position: fixed; left: 20px; bottom: 88px; z-index: 40; max-width: 320px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px;
+    padding: 10px 12px; box-shadow: var(--shadow-lg); cursor: pointer;
+    font-size: 12.5px; line-height: 1.45; color: var(--ink-soft);
+  }
+  .beanary-hint:hover { border-color: #DCCFB6; }
+  .beanary-hint-x {
+    flex: none; font-family: inherit; font-size: 15px; line-height: 1;
+    color: var(--ink-faint); background: none; border: none; cursor: pointer;
+    padding: 2px 4px; border-radius: 7px;
+  }
+  .beanary-hint-x:hover { color: var(--ink); background: #F0E6D4; }
+
+  /* ---- The demo tour (web/bean-tour.jsx). Demo deployments only. ----
+     A bar pinned to the bottom, NOT a modal with a backdrop. The last step's whole ask is "have a
+     click around", and a scrim over the page would eat the click it just invited. So the tour never
+     covers the inbox; it rings the row it is talking about and leaves everything else live. */
+  .bean-tour {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 60;
+    width: min(680px, calc(100vw - 32px));
+    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--paper); border: 1.5px solid #E8D9BE; border-radius: 18px;
+    padding: 16px 44px 16px 16px; box-shadow: var(--shadow-lg);
+  }
+  .bean-tour-mark { flex: none; margin-top: 2px; }
+  .bean-tour-body { min-width: 0; flex: 1; }
+  .bean-tour-count {
+    font-size: 10.5px; font-weight: 900; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--bean); margin-bottom: 3px;
+  }
+  .bean-tour h3 { margin: 0 0 4px; font-size: 15.5px; font-weight: 700; }
+  .bean-tour p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink-soft); }
+  .bean-tour-acts { flex: none; display: flex; align-items: center; gap: 8px; align-self: flex-end; }
+  .bean-tour-back, .bean-tour-next {
+    font-family: inherit; font-size: 12px; font-weight: 800; letter-spacing: .3px;
+    padding: 7px 15px; border-radius: 999px; cursor: pointer; transition: all .12s; white-space: nowrap;
+  }
+  .bean-tour-back { color: var(--ink-faint); background: none; border: 1.5px solid var(--line); }
+  .bean-tour-back:hover { color: var(--ink); border-color: #DCCFB6; }
+  .bean-tour-next { color: var(--paper); background: var(--bean); border: 1.5px solid var(--bean); }
+  .bean-tour-next:hover { background: #5B3720; border-color: #5B3720; }
+  .bean-tour-x {
+    position: absolute; top: 10px; right: 12px; font-family: inherit; font-size: 18px; line-height: 1;
+    color: var(--ink-faint); background: none; border: none; cursor: pointer; padding: 4px 6px;
+    border-radius: 8px;
+  }
+  .bean-tour-x:hover { color: var(--ink); background: #F0E6D4; }
+  /* The ring on the row under discussion. Outline and not border: `.inbox-row` already carries a
+     4px left border that IS its confidence colour, and growing a border here would shove the whole
+     row's contents sideways on every step. */
+  .bean-tour-spot {
+    outline: 2.5px solid var(--bean); outline-offset: 3px;
+    box-shadow: var(--shadow-lg); position: relative; z-index: 1;
+  }
+  @media (max-width: 620px) {
+    .bean-tour { flex-wrap: wrap; }
+    .bean-tour-acts { width: 100%; justify-content: flex-end; }
+  }
   .clear-fyi {
     font-family: inherit; font-size: 11px; font-weight: 800; letter-spacing: .3px;
     color: var(--ink-faint); background: none; border: 1.5px solid var(--line);
@@ -179,6 +568,16 @@
   .row-snippet { font-size: 13px; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
   .row-time { font-size: 11.5px; color: var(--ink-faint); font-weight: 700; }
+  /* The per-row Clear. Always rendered, never hover-only: a control that only exists on hover does
+     not exist on a phone, and she triages on one. Quiet until touched so it never competes with the
+     confidence badge, which is the thing the row is actually saying. */
+  .row-clear {
+    font-size: 11px; font-weight: 800; letter-spacing: .3px; color: var(--ink-faint);
+    border: 1.5px solid var(--line); border-radius: 999px; padding: 2px 9px; cursor: pointer;
+    transition: all .12s; user-select: none;
+  }
+  .row-clear:hover { color: #B4472E; border-color: #E4C3B4; background: #FBEFE9; }
+  .row-clear:focus-visible { outline: none; box-shadow: 0 0 0 3px #e7d9c2; }
   .row-status { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
   .row-status.approved, .row-status.handled { color: #2E7D3E; background: #EAF6EC; }
   .row-status.skipped { color: #9A6A12; background: #FBF1DA; }
@@ -206,9 +605,12 @@
   }
   .email-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
   .email-avatar { width: 44px; height: 44px; border-radius: 12px; background: #ece6f7; color: #6d4aff; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
-  .email-from { font-weight: 800; font-size: 15px; }
+  /* A long sender name wrapped to two lines and the absolute-width time sat on top of it. The name
+     truncates instead: the address below it and the thread bylines already carry identity, and a
+     collision reads as broken in a way a clipped name does not. */
+  .email-from { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .email-addr { font-size: 12.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; }
-  .email-time { margin-left: auto; font-size: 12px; color: var(--ink-faint); font-weight: 700; flex: none; }
+  .email-time { margin-left: auto; font-size: 12px; color: var(--ink-faint); font-weight: 700; flex: none; white-space: nowrap; }
   .email-subject { font-weight: 700; font-size: 18px; line-height: 1.3; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1.5px dashed var(--line); overflow-wrap: anywhere; }
   .email-body p { margin: 0 0 12px; color: #4a4338; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
   .email-body p:last-child { margin-bottom: 0; }
@@ -289,6 +691,128 @@
      confidence draft state uses, so "Bean isn't sure" and "Bean couldn't save" read as one family. */
   .bean-toast.is-warn { border-left: 4px solid #E8A87C; padding-left: 14px; }
 
+  /* ---------- Bean chat ----------
+     z-index: the toast owns 60 at bottom-centre; the launcher and panel sit at 50 on the left,
+     so the two never overlap on desktop. Below 420px the panel is a bottom sheet and the launcher
+     lifts to clear the toast instead of sitting under it. */
+
+  .bean-chat-root { position: fixed; left: 20px; bottom: 20px; z-index: 50; }
+
+  .bean-chat-launcher {
+    position: relative; display: grid; place-items: center;
+    width: 50px; height: 50px; padding: 0;
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 999px;
+    box-shadow: var(--shadow); cursor: pointer;
+    transition: transform .2s cubic-bezier(.2,.9,.3,1.2), border-color .15s;
+  }
+  .bean-chat-launcher:hover { transform: translateY(-2px); border-color: #DBCDB4; }
+  .bean-chat-launcher:focus-visible { outline: none; box-shadow: var(--shadow), 0 0 0 3px #e7d9c2; }
+  .bean-chat-root.is-open .bean-chat-launcher { transform: scale(.86); opacity: .55; }
+
+  /* Something is waiting on her judgment. Amber, not red — a proposal is a question, not a failure. */
+  .bean-chat-dot {
+    position: absolute; top: 1px; right: 1px;
+    width: 11px; height: 11px; border-radius: 999px;
+    background: #E0A92E; box-shadow: 0 0 0 2.5px var(--paper);
+  }
+
+  /* Grows out of the launcher, not in from the screen edge — same spring the toast uses. */
+  .bean-chat-panel {
+    position: absolute; left: 0; bottom: 62px;
+    width: 380px; height: 540px; max-height: calc(100vh - 110px);
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--paper); border: 1.5px solid var(--line); border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    transform-origin: bottom left;
+    transform: scale(.6) translateY(12px); opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .28s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .bean-chat-root.is-open .bean-chat-panel {
+    transform: scale(1) translateY(0); opacity: 1; pointer-events: auto;
+  }
+
+  .chat-head {
+    display: flex; align-items: center; gap: 10px; flex: none;
+    padding: 13px 14px; border-bottom: 1.5px solid var(--line-soft);
+    background: linear-gradient(var(--cream-2), var(--paper));
+  }
+  .chat-head-title { font-size: 15px; font-weight: 700; letter-spacing: -.2px; line-height: 1.2; }
+  .chat-head-sub { font-size: 11px; color: var(--ink-faint); letter-spacing: .2px; }
+  .chat-x {
+    flex: none; width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+    background: transparent; border: none; color: var(--ink-faint); font-size: 19px; line-height: 1;
+  }
+  .chat-x:hover { background: var(--cream-2); color: var(--ink); }
+
+  .chat-scroll { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 16px; }
+
+  .chat-turn { display: flex; }
+  .chat-turn-you { justify-content: flex-end; }
+  .chat-bubble {
+    max-width: 84%; background: var(--cream-2); border: 1.5px solid var(--line);
+    border-radius: 14px 14px 4px 14px; padding: 9px 13px;
+    font-size: 13.5px; line-height: 1.55; color: var(--ink); text-wrap: pretty;
+  }
+  /* Bean gets no bubble. She is the paper; the operator is the visitor on it. */
+  .chat-turn-bean { gap: 9px; align-items: flex-start; }
+  .chat-gutter { flex: none; width: 20px; padding-top: 2px; }
+  .chat-said { flex: 1; min-width: 0; }
+  .chat-line { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--ink); text-wrap: pretty; }
+  .chat-line-faint { color: var(--ink-faint); }
+
+  .chat-cites { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+  .chat-cites-lead { font-size: 11.5px; color: var(--ink-faint); }
+  .chat-cite {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: inherit; font-size: 11.5px; font-weight: 700;
+    border: 1px solid; border-radius: 999px; padding: 3px 9px; cursor: pointer;
+  }
+  .chat-cite:hover { filter: brightness(.97); }
+
+  .chat-empty { margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 12px; text-align: center; }
+  .chat-empty-lead { font-size: 14.5px; font-weight: 700; color: #3a342c; }
+  .chat-empty-sub { font-size: 12.5px; line-height: 1.6; color: var(--ink-faint); max-width: 260px; text-wrap: pretty; }
+
+  /* Composer — PaperText's idiom (bean-notebook.jsx): no box, a faint underline only while she's in it. */
+  .chat-composer {
+    flex: none; display: flex; align-items: flex-end; gap: 8px;
+    padding: 11px 12px 12px; border-top: 1.5px solid var(--line-soft); background: var(--paper);
+  }
+  .chat-input {
+    flex: 1; min-width: 0; resize: none; overflow-y: auto; max-height: 132px;
+    border: none; border-bottom: 1.5px solid transparent; background: transparent;
+    outline: none; font: inherit; font-size: 13.5px; line-height: 1.6; color: #4A4236;
+    padding: 4px 0; transition: border-color .15s;
+  }
+  .chat-input:focus { border-bottom-color: #D9CBA6; }
+  .chat-input::placeholder { color: var(--ink-faint); }
+  .chat-send {
+    flex: none; width: 32px; height: 32px; border-radius: 10px; cursor: pointer;
+    background: var(--bean); color: #fff8ee; border: none; font-family: inherit; font-size: 15px; line-height: 1;
+    transition: opacity .15s;
+  }
+  .chat-send:disabled { opacity: .3; cursor: default; }
+
+  @media (max-width: 420px) {
+    .bean-chat-root { left: 14px; right: 14px; bottom: 88px; }
+    /* The launcher rises to 88px here, so the nub above it has to rise with it or they overlap. */
+    .beanary-hint { left: 14px; right: 14px; bottom: 152px; max-width: none; }
+    .bean-chat-panel {
+      position: fixed; left: 0; right: 0; bottom: 0; width: auto;
+      height: 78vh; max-height: none;
+      border-radius: 20px 20px 0 0; border-bottom: none;
+      transform-origin: bottom center;
+      transform: translateY(14px) scale(.98);
+    }
+    .bean-chat-root.is-open .bean-chat-panel { transform: translateY(0) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bean-chat-panel { transition: opacity .12s linear; transform: none; }
+    .bean-chat-root.is-open .bean-chat-panel { transform: none; }
+    .bean-chat-launcher, .bean-chat-root.is-open .bean-chat-launcher { transition: none; transform: none; }
+  }
+
   /* ---------- Thread history + Shopify links (draft view) ---------- */
   .shopify-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .shopify-link {
@@ -302,20 +826,81 @@
   .thread-msg { border-left: 3px solid var(--line); padding: 0 0 0 11px; margin-bottom: 10px; }
   .thread-msg p { margin: 0 0 5px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
   .thread-msg p:last-child { margin-bottom: 0; }
+  .thread-msg-head { display: flex; align-items: baseline; gap: 7px; width: 100%; background: none; border: 0; padding: 0 0 4px; margin: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; min-width: 0; }
+  .thread-msg.is-collapsed .thread-msg-head { padding-bottom: 0; }
+  .thread-caret { font-size: 9px; color: var(--ink-faint); flex: none; }
+  /* Byline and peek both truncate rather than wrap or overflow: `min-width:0` is what lets a flex
+     child shrink below its content width, without which the ellipsis never fires and the text is
+     sliced off mid-character at the card edge. The byline shrinks last — it is the useful half. */
+  .thread-who { font-size: 11.5px; font-weight: 700; color: var(--ink-faint); white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .thread-peek { font-size: 12px; color: var(--ink-faint); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
+  .thread-body { max-height: 260px; overflow-y: auto; }
+  .thread-more { display: block; background: none; border: 0; padding: 0 0 9px; margin: 0; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--bean); letter-spacing: .2px; }
+  .thread-more:hover { text-decoration: underline; }
   .thread-current { font-size: 11px; font-weight: 800; color: var(--bean); letter-spacing: .4px; }
   .thread-pill { font-size: 10.5px; font-weight: 800; color: var(--bean); background: #f1e7d6; border: 1px solid #e2d0b6; padding: 1px 7px; border-radius: 999px; white-space: nowrap; letter-spacing: .2px; }
+  /* Warmer than the thread pill and deliberately louder: an unanswered chase is the one thing in a
+     row that is about the CUSTOMER's patience rather than about Bean's confidence. */
+  .chase-pill { font-size: 10.5px; font-weight: 800; color: #9a4b2e; background: #fbe9df; border: 1px solid #f0cdb9; padding: 1px 7px; border-radius: 999px; white-space: nowrap; letter-spacing: .2px; }
+  /* One customer's unanswered conversation, as one thing to act on. The card is a hairline around
+     the row she taps — the members underneath are secondary, so they never compete with it. */
+  .convo-card { border: 1.5px solid #f0cdb9; border-radius: 16px; background: #fdf5ef; padding: 5px; }
+  .convo-card-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 10px 5px; }
+  .convo-more, .convo-redraft {
+    font-family: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    background: none; border: none; padding: 2px 0; color: #9a4b2e; letter-spacing: .2px;
+  }
+  .convo-more:hover { text-decoration: underline; }
+  .convo-redraft {
+    margin-left: auto; border: 1px solid #f0cdb9; background: var(--paper);
+    border-radius: 999px; padding: 4px 11px;
+  }
+  .convo-redraft:hover:not(:disabled) { background: #fbe9df; }
+  .convo-redraft:disabled { opacity: .6; cursor: default; }
+  .convo-card-rows { display: flex; flex-direction: column; gap: 8px; padding: 3px 0 5px; }
+  /* Members read as inset under the row that answers them, not as peers of it. */
+  .convo-card-rows .inbox-row { margin-left: 18px; opacity: .85; }
+
+  .convo-strip { background: #fbe9df; border: 1.5px solid #f0cdb9; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+  .convo-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #9a4b2e; margin-bottom: 9px; }
+  .convo-msg { border-left: 3px solid #f0cdb9; padding-left: 11px; margin-bottom: 10px; }
+  .convo-msg:last-child { margin-bottom: 0; }
+  .convo-when { font-size: 11px; font-weight: 700; color: #9a4b2e; opacity: .8; margin-bottom: 3px; }
+  .convo-body { max-height: 190px; overflow-y: auto; }
+  .convo-body p { margin: 0 0 5px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+  .convo-body p:last-child { margin-bottom: 0; }
 
   /* ---------- Teach-Bean entry ---------- */
   .teach-btn {
     display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 800;
     color: var(--bean); background: var(--paper); border: 1.5px solid var(--line);
-    padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: inherit;
+    padding: 6px 9px; border-radius: 999px; cursor: pointer; font-family: inherit;
+    /* A pill that wraps mid-label reads as broken rather than as tight. The ROW may wrap; the
+       buttons in it may not. "Teach Bean (43 left)" was the one that gave it away. */
+    white-space: nowrap; flex: none;
   }
   .teach-btn:hover { border-color: var(--bean); }
+  /* "(43 left)" cost ~45px and pushed Settings onto a second row. A badge says the same thing in
+     a third of the space, and reads as a count rather than as part of the label. */
+  /* Something new to read. Amber like the chat's pending dot — the same "worth a look, not a
+     problem" colour, so the two never read as different kinds of signal. */
+  .new-dot {
+    width: 7px; height: 7px; border-radius: 999px; background: #E0A92E; flex: none;
+    margin-left: 1px;
+  }
+  .teach-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+    background: var(--bean); color: #fff8ee; font-size: 10.5px; font-weight: 800; line-height: 1;
+  }
 
   /* ---------- Admin surface ---------- */
   .admin-view { animation: fadeUp .25s ease; }
-  .admin-shell { display: grid; grid-template-columns: 210px 1fr; gap: 20px; align-items: start; }
+  .admin-shell { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; align-items: start; }
+  /* The settings surface reads wider than the inbox does: it is dense records, not a scan list.
+     The widening has to happen on the SHELL — everything renders inside it, so a max-width on the
+     inner view alone is a no-op against the shell's 960. Only this view opts in; the inbox keeps
+     its comfortable measure. */
   .admin-nav {
     position: sticky; top: 84px; display: flex; flex-direction: column; gap: 3px;
     background: var(--paper); border: 1.5px solid var(--line); border-radius: 16px; padding: 12px; box-shadow: var(--shadow);
@@ -550,6 +1135,20 @@
   <script src="bean-notebook.jsx"></script>
   <script src="bean-proposal.jsx"></script>
   <script src="bean-questionnaire.jsx"></script>
+  <!-- The thinking mark. Only adds classes (all motion is the `Bean roast` keyframe block above),
+       so it has no load-order constraint of its own beyond preceding bean-root. -->
+  <script src="bean-roast.jsx"></script>
+  <!-- after bean-proposal + bean-roast: a chat turn resolves into a ProposalCard, and its thinking
+       row is the roasting mark. Both are read at render time via window, so this only has to
+       precede bean-root. -->
+  <script src="bean-chat.jsx"></script>
+  <!-- after bean-ui: the stats charts colour the confidence mix from the same CONF map the
+       badges use, so the report and the inbox can't disagree about what green looks like. -->
+  <script src="bean-stats.jsx"></script>
+  <!-- The public demo's guided tour. Reads window.PlayfulMark at render time and finds its targets
+       by querySelector after the inbox has painted, so it only has to precede bean-root. Inert on
+       every real tenant: bean-root mounts it solely when BEAN_DEMO_TENANT is set. -->
+  <script src="bean-tour.jsx"></script>
   <script src="bean-root.jsx"></script>
 </body>
 </html>

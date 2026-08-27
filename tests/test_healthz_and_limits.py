@@ -59,7 +59,7 @@ def server(tmp_path, monkeypatch):
     monkeypatch.setattr(srv, "CONFIG_PATH", cfg_path)
     monkeypatch.setattr(srv, "CORRECTIONS_PATH", corrections_path())
     monkeypatch.setattr(srv, "STATUS_PATH", tmp_path / "status.json")
-    monkeypatch.setattr(srv, "gate", lambda email, rules=None: GateResult("reply"))
+    monkeypatch.setattr(srv, "gate", lambda email, rules=None, customer=None: GateResult("reply"))
 
     nb_path = tmp_path / "notebook.md"
     Notebook("A store", buckets=[Bucket("Sofas & Upholstery", "cite the product doc")]).save(nb_path)

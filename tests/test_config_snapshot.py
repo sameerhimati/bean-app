@@ -124,12 +124,23 @@ def _denylist():
 
     Absent means "this is the public tree" (gitignored) — or a fresh private clone, where it must
     be restored before the identity gate means anything. See CLAUDE.md.
+
+    ⚠️ EVERYTHING HERE IS CASE-FOLDED, and that is not tidiness. The denylist stores the operator's
+    name the way a person writes it — capitalised — and the scan used to be a plain `in`. But the
+    name is also her TENANT KEY, which is lowercase by construction (`BEAN_CUSTOMER=<tenant>`, the
+    directory on the volume), so every `BEAN_CUSTOMER=` line in a docstring or a deploy note read
+    straight past a gate that was reporting green. One had already reached a tracked file — a usage
+    example in scripts/backfill_drafted_history.py, caught in the 2026-08-26 sync by grepping the
+    publish set by hand, which is exactly the manual step this file exists to replace.
+
+    The same identifier has two written forms and only one of them was ever forbidden. Fold both.
     """
     try:
         raw = json.loads(_DENYLIST_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return tuple(raw["identifiers"]), re.compile(raw["order_pattern"])
+    identifiers = tuple(i.lower() for i in raw["identifiers"])
+    return identifiers, re.compile(raw["order_pattern"], re.IGNORECASE)
 
 
 def _assert_no_real_identity(blob: str, label: str):
@@ -137,8 +148,9 @@ def _assert_no_real_identity(blob: str, label: str):
     if loaded is None:
         pytest.skip(f"tests/identity_denylist.json absent — the real-identity gate cannot run here")
     identifiers, order_re = loaded
+    folded = blob.lower()   # identifiers are already lowered by _denylist
     for identifier in identifiers:
-        assert identifier not in blob, f"{label} leaks {identifier!r}"
+        assert identifier not in folded, f"{label} leaks {identifier!r}"
     assert not order_re.search(blob), f"{label} leaks a real order number"
 
 
@@ -286,8 +298,9 @@ def test_no_tracked_file_anywhere_carries_the_real_operators_identity():
 
     leaks = []
     for name, text in _tracked_text_files():
+        folded = text.lower()   # see _denylist: the tenant key is the name, lowercased
         for identifier in identifiers:
-            if identifier in text:
+            if identifier in folded:
                 leaks.append(f"{name}: {identifier!r}")
         if order_re.search(text):
             leaks.append(f"{name}: a real order number")

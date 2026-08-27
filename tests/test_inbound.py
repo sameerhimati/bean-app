@@ -77,7 +77,7 @@ def test_reply_target_prefers_replyto_when_set():
 
 # ---- a live server on an ephemeral port, pointed at tmp data ---------------------------------
 
-def _fake_gate(email, rules=None):
+def _fake_gate(email, rules=None, customer=None):
     """Deterministic offline gate: store notification mail (from the platform, or a shipment
     subject) files as 'notification'; everything else needs a reply."""
     hay = f"{email.sender_email} {email.subject}".lower()
@@ -86,7 +86,7 @@ def _fake_gate(email, rules=None):
     return GateResult("reply", "customer", "A customer asking about their order.")
 
 
-def _resolving_gate(email, rules=None):
+def _resolving_gate(email, rules=None, customer=None):
     """A gate that resolves a website contact-form relay to the real customer in the body — the
     dynamic-envelope path. (The default _fake_gate would FILE mailer@shopify.com as a notification;
     this test overrides it to exercise the reply+resolution wiring.)"""
@@ -99,13 +99,13 @@ def _resolving_gate(email, rules=None):
     )
 
 
-def _filed_gate(email, rules=None):
+def _filed_gate(email, rules=None, customer=None):
     """A gate that FILES everything as a non-receipt newsletter — exercises the filed-persist path
     (a live gate false-negative: a real customer this gate wrongly sets aside must still be stored)."""
     return GateResult("file", "newsletter", "A marketing newsletter — no question in it.")
 
 
-def _notification_gate(email, rules=None):
+def _notification_gate(email, rules=None, customer=None):
     """A gate that calls everything a notification — the live verdict on mail that carries no order
     (a forwarding/domain-auth confirmation). Pairs with a payload the notification parser rejects."""
     return GateResult("file", "notification", "An automated notification — nothing to reply to.")
@@ -127,6 +127,14 @@ def inbound_server(tmp_path, monkeypatch):
     monkeypatch.setenv("BEAN_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("BEAN_PASSCODE", raising=False)  # passcode gate off (the operator is 'authed')
     monkeypatch.setattr(srv, "CONFIG_PATH", tmp_path / "bean-config.json")  # absent → fixtures gate
+    # CORRECTIONS_PATH is bound at IMPORT time from BEAN_CUSTOMER (server.py:79), so setting
+    # BEAN_DATA_DIR above does not move it — by then it already points into the repo's data/ dir.
+    # Patch it explicitly, exactly as base_url does. Without this line the confidence assertions
+    # below pass only because data/maplemoss/corrections.jsonl happens not to exist: run the suite
+    # with BEAN_CUSTOMER set (which scripts/deploy.sh does) and the server under test reads a REAL
+    # tenant's correction log off the developer's disk, the shelf finds neighbours, and the
+    # empty-shelf yellow cap never fires.
+    monkeypatch.setattr(srv, "CORRECTIONS_PATH", tmp_path / "corrections.jsonl")
     monkeypatch.setattr(srv, "gate", _fake_gate)
 
     nb_path = tmp_path / "notebook.md"
@@ -175,7 +183,12 @@ def test_inbound_customer_triages_and_persists_to_inbox(inbound_server, monkeypa
     assert item["received_at"] == payload["Date"]  # from the payload, deterministic
     # the stored result is the engine's output, so the UI renders without re-running the model
     assert item["result"]["bucket"] == "Order Status"
-    assert item["result"]["confidence"] == "green"
+    # YELLOW, not green, and the model asked for green: this tenant has no correction log, so the
+    # shelf is empty and the engine's empty-shelf rule caps it. Asserted through the real webhook
+    # rather than at the unit level because that is the only way to know the rule actually reaches
+    # production — a green here would mean the model's self-report had won.
+    assert item["result"]["confidence"] == "yellow"
+    assert any("no close past reply" in w for w in item["result"]["why_unsure"])
     assert item["result"]["draft"] == "Hi Jordan, it shipped via USPS."
 
 
@@ -194,7 +207,8 @@ def test_inbound_stores_a_draft_result(inbound_server, monkeypatch):
     item = load_inbox(inbox_path())[0]
     result = item["result"]
     assert result["bucket"] == "Order Status"
-    assert result["confidence"] == "green"  # the groundedness axis
+    # The groundedness axis, capped at yellow by the empty shelf (no corrections for this tenant).
+    assert result["confidence"] == "yellow"
     assert result["citations"] == ["notebook:Order Status"]
     assert "chunks" not in result
 

@@ -23,6 +23,15 @@ from pathlib import Path
 import pytest
 
 _INBOX_JSX = Path(__file__).parent.parent / "web" / "bean-inbox.jsx"
+# Where node resolves `require('jsdom')` from. The repo's documented setup installs it under
+# tests/js (see tests/js/package.json), and every other jsdom harness here runs node with that as its
+# cwd. These two ran it with NO cwd, so they resolved against whatever happened to be beside the
+# process — which on this machine is a stray gitignored node_modules at the repo root. Follow the
+# documented install on a clean clone and they skipped forever, saying "jsdom not installed" while
+# four sibling harnesses ran fine. Skips do not lie here, but a skip nobody can clear is a test that
+# does not exist.
+_JS = Path(__file__).parent / "js"
+
 _START = "// ---- the correction outbox"
 _END = "// ---------- Header ----------"
 
@@ -79,7 +88,7 @@ def _run(script: str, *, responses: list, now_ms: int | None = None, seed: list 
     }})();
     """
     proc = subprocess.run(["node", "--input-type=commonjs", "-e", harness],
-                          capture_output=True, text=True)
+                          cwd=str(_JS), capture_output=True, text=True)
     if proc.returncode != 0:
         if "Cannot find module 'jsdom'" in proc.stderr:
             pytest.skip("jsdom not installed — run `npm install` to cover the correction outbox")

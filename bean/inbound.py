@@ -16,19 +16,15 @@ import html
 import re
 
 from bean.contract import Email
+from bean.quoting import THREAD_DELIM_RE as _THREAD_DELIM_RE
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"[ \t]*\n[ \t\n]*")
 
-# Where a reply's latest message ends and the quoted history begins. Covers the common clients:
-# Gmail/Proton/Apple "On <date> <someone> wrote:", Outlook's "-----Original Message-----", and a
-# bare underscore rule. Not exhaustive — the model also gets the thread, so a near-miss just moves
-# a little text between body and thread, it doesn't lose anything.
-_THREAD_DELIM_RE = re.compile(
-    r"(?ms)^[ \t]*On\b.{0,400}?\bwrote:[ \t]*$"
-    r"|^[ \t]*-{2,}\s*Original Message\s*-{2,}"
-    r"|^[ \t]*_{5,}",
-)
+# Where a reply's latest message ends and the quoted history begins lives in bean/quoting.py now —
+# that module splits the SAME delimiters into the individual messages the UI and the prompt read, so
+# a second copy here would be two definitions that drift. Not exhaustive — the model also gets the
+# thread, so a near-miss just moves a little text between body and thread, it doesn't lose anything.
 
 
 def _strip_html(raw: str) -> str:

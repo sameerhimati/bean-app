@@ -16,6 +16,7 @@ reply it wasn't handed the grounding for.
 
 from __future__ import annotations
 
+from bean import quoting
 from bean.contract import DraftResult, Email, Grounding
 from bean.llm import DRAFT_MODEL, Model
 from bean.notebook import Notebook
@@ -100,22 +101,45 @@ def _exemplar_block(exemplars: list[Exemplar]) -> str:
 
 
 def _user_message(
-    email: Email, exemplars: list[Exemplar], thread: list[str], customer_history: str | None
+    email: Email,
+    exemplars: list[Exemplar],
+    thread: list[str],
+    customer_history: str | None,
+    conversation: str | None = None,
 ) -> str:
     parts = ["CUSTOMER EMAIL", f"From: {email.sender_name} <{email.sender_email}>", f"Subject: {email.subject}", "", email.body]
-    prior = list(thread) or list(email.thread)
+    # "(oldest first)" was a lie for as long as this line existed. `thread` is stored as ONE raw
+    # quoted blob, and a quoted blob is newest-first-nested — outermost is the most recent message,
+    # and every `>` level goes further back. So the model was told oldest-first and handed the exact
+    # reverse, inside a wall of quote markers that hid up to thirteen real messages in what the UI
+    # counted as one. bean/quoting.py unpacks it into the order this header has always claimed.
+    prior = quoting.thread_for_prompt(
+        list(thread) or list(email.thread), email.sender_email, email.sender_name
+    )
     if prior:
         parts += ["", "EARLIER IN THIS THREAD (oldest first):", *prior]
+    # Placed ABOVE the customer history on purpose. The history is about this person across every
+    # subject; this is the one conversation they are waiting on, and it decides what the reply must
+    # cover — all of it, or only what is new. Empty for a single email, so the ordinary case is
+    # byte-identical to the prompt before grouping existed.
+    if conversation:
+        parts += ["", conversation]
     if customer_history:
         parts += ["", "THIS CUSTOMER'S HISTORY:", customer_history]
     parts += ["", "HER PAST REPLIES YOU MAY LEAN ON (cite as corpus:<id>):", _exemplar_block(exemplars)]
     return "\n".join(parts)
 
 
-def _coerce(data: dict, notebook: Notebook, email_id: str) -> DraftResult:
+def _coerce(data: dict, notebook: Notebook, email_id: str, *, has_shelf: bool = True) -> DraftResult:
     """Turn the raw tool output into a validated DraftResult, coercing DOWN only. A green with no
     citation is not grounded, so it becomes yellow; a bucket the notebook doesn't know becomes the
-    escalate bucket. Never coerces up — honesty is monotonic here."""
+    escalate bucket. Never coerces up — honesty is monotonic here.
+
+    `has_shelf` is False when retrieval found nothing close (`shelf.has_neighbor`). It closes an
+    asymmetry that stood here for months: the citation rule was enforced in CODE, but the
+    empty-shelf case was only ever a sentence in the prompt (`_exemplar_block`'s "you have nothing
+    of hers to lean on"). So one honesty guarantee was a rule and the other was a polite request —
+    in a product whose entire thesis is not trusting the model's self-report. Both are rules now."""
     valid = set(notebook.bucket_names()) | {ESCALATE_BUCKET}
     bucket = data.get("bucket") or ESCALATE_BUCKET
     if bucket not in valid:
@@ -133,6 +157,12 @@ def _coerce(data: dict, notebook: Notebook, email_id: str) -> DraftResult:
     stakes = next((b.stakes for b in notebook.buckets if b.name == bucket), "normal")
     if confidence == Grounding.GREEN and stakes == "high":
         confidence, why_unsure = Grounding.YELLOW, why_unsure + ["high-stakes bucket — worth a look before sending"]
+
+    # An empty shelf means she has never answered anything like this. The notebook may still cover
+    # it in general terms, so this is not an automatic red — but it is never a one-tap send, because
+    # "approve blind" is a promise that she has already made this exact call before.
+    if confidence == Grounding.GREEN and not has_shelf:
+        confidence, why_unsure = Grounding.YELLOW, why_unsure + ["no close past reply of yours to lean on"]
 
     if confidence == Grounding.GREEN and not citations:
         confidence, why_unsure = Grounding.YELLOW, why_unsure + ["draft is not grounded in a cited source"]
@@ -163,6 +193,7 @@ def draft_email(
     email: Email,
     adapter: Model,
     *,
+    conversation: str | None = None,
     max_tokens: int = 1500,
 ) -> DraftResult:
     """One model call: (notebook + shelf exemplars + email) → a validated DraftResult.
@@ -174,12 +205,12 @@ def draft_email(
         {"type": "text", "text": _INSTRUCTIONS},
         {"type": "text", "text": notebook.render()},
     ]
-    user = _user_message(email, exemplars, thread, customer_history)
+    user = _user_message(email, exemplars, thread, customer_history, conversation)
     result = adapter.structured(
         system=system, user=user, tool=DRAFT_TOOL, images=email.image_paths or None, max_tokens=max_tokens
     )
     # The tool has no email_id field (it's context, not a model decision) — stamp it from the email.
-    return _coerce(result.data, notebook, email.id)
+    return _coerce(result.data, notebook, email.id, has_shelf=bool(exemplars))
 
 
 DEFAULT_MODEL = DRAFT_MODEL

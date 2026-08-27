@@ -29,31 +29,47 @@ PRICES: dict[str, tuple[float, float]] = {
     "claude-opus-4-8": (5.00, 25.00),
 }
 
-# Cache write is priced off input price at 1.25x (5-min TTL) or 2.0x (1-hour TTL). The log
-# (bean/llm.py _log_usage) does not record which TTL a write used — Bean has only ever requested
-# the default (5-min) `cache_control` block, so 1.25x is the correct assumption today, not a guess
-# of convenience. If a 1-hour TTL is ever requested, this constant must become per-line data.
-CACHE_WRITE_MULTIPLIER = 1.25
+# Cache write is priced off input price at 1.25x (5-min TTL) or 2.0x (1-hour TTL). This used to be
+# one constant at 1.25x, with a note that it must become per-line data the day Bean requested a
+# 1-hour TTL. bean/adapter.py now does (its `_CACHE_CONTROL` explains why the 5-minute default was
+# measured to be a net loss on this mail pattern), so it is that day and this is that data.
+#
+# Read per line from `cache_ttl`, which `bean/llm.py _log_usage` stamps from the TTL the request
+# actually asked for. A line with no `cache_ttl` is a line written before the field existed, when
+# Bean only ever requested the default — so the absent case is 5-minute, and it is a fact about
+# those lines rather than a fallback. That is the whole reason this is per-line: flipping the
+# constant to 2.0 would have retroactively marked up ~1,600 historical writes that really were
+# billed at 1.25x, and a cost report's only job is being right.
+CACHE_WRITE_MULTIPLIERS = {"5m": 1.25, "1h": 2.0}
+DEFAULT_CACHE_TTL = "5m"
 CACHE_READ_MULTIPLIER = 0.1
 CACHE_READ_MULTIPLIER_OPUS = 0.5  # opus prices a cache read at 5x every other model's rate
 
 
-def call_cost(model: str, *, input_tokens: int, output_tokens: int, cache_read: int, cache_write: int) -> float | None:
+def call_cost(model: str, *, input_tokens: int, output_tokens: int, cache_read: int, cache_write: int,
+              cache_ttl: str | None = None) -> float | None:
     """Cost of one call in USD, or None if `model` isn't in PRICES.
 
     None (not 0.0) on an unknown model is load-bearing: a model added to llm.py but not priced here
     must show up as a hole in the report, not a silent $0 that understates spend without a trace.
+
+    An unrecognised `cache_ttl` prices at the 5-minute rate rather than raising — this is a report,
+    and refusing to total a month of spend over one odd string is the wrong trade. It can only ever
+    UNDERSTATE (1.25x is the cheaper multiplier), which is the safe direction for a number the
+    author quotes at himself.
     """
     price = PRICES.get(model)
     if price is None:
         return None
     input_price, output_price = price
     cache_read_mult = CACHE_READ_MULTIPLIER_OPUS if model == "claude-opus-4-8" else CACHE_READ_MULTIPLIER
+    cache_write_mult = CACHE_WRITE_MULTIPLIERS.get(cache_ttl or DEFAULT_CACHE_TTL,
+                                                   CACHE_WRITE_MULTIPLIERS[DEFAULT_CACHE_TTL])
     return (
         input_tokens * input_price
         + output_tokens * output_price
         + cache_read * input_price * cache_read_mult
-        + cache_write * input_price * CACHE_WRITE_MULTIPLIER
+        + cache_write * input_price * cache_write_mult
     ) / 1_000_000
 
 
@@ -118,7 +134,8 @@ def aggregate(lines: list[dict]) -> dict[tuple[str, str], UsageRow]:
         row.cache_write += cw
         if cr > 0:
             row.cache_hit_calls += 1
-        cost = call_cost(model, input_tokens=it, output_tokens=ot, cache_read=cr, cache_write=cw)
+        cost = call_cost(model, input_tokens=it, output_tokens=ot, cache_read=cr, cache_write=cw,
+                         cache_ttl=line.get("cache_ttl"))
         if cost is None:
             row.unpriced_calls += 1
         else:

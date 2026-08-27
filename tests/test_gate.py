@@ -83,6 +83,9 @@ def test_anything_not_clearly_no_goes_to_reply():
 @pytest.fixture
 def gated_url(tmp_path, monkeypatch):
     monkeypatch.setattr(srv, "CONFIG_PATH", tmp_path / "bean-config.json")
+    # Bound at import from BEAN_CUSTOMER, so it must be patched, not left to BEAN_DATA_DIR — see
+    # the note on the same line in test_inbound.py's inbound_server.
+    monkeypatch.setattr(srv, "CORRECTIONS_PATH", tmp_path / "corrections.jsonl")
     _install_engine(monkeypatch, tmp_path)
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), srv.BeanHandler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -112,7 +115,7 @@ def test_preview_files_before_the_engine(gated_url, monkeypatch, tmp_path):
 
     _install_engine(monkeypatch, tmp_path, model=_MustNotRun())
     monkeypatch.setattr(srv, "gate",
-                        lambda email, rules=None: GateResult("file", "newsletter", "No question."))
+                        lambda email, rules=None, customer=None: GateResult("file", "newsletter", "No question."))
 
     status, body = _post(f"{gated_url}/api/preview", _EMAIL_PAYLOAD)
     assert status == 200
@@ -123,10 +126,12 @@ def test_preview_files_before_the_engine(gated_url, monkeypatch, tmp_path):
 def test_skip_gate_recovers_into_the_engine(gated_url, monkeypatch):
     """The mis-file recovery path: skipGate bypasses the gate entirely and drafts. Without it a
     wrongly-filed customer would have no way back into the queue."""
-    def gate_must_not_run(email, rules=None):
+    def gate_must_not_run(email, rules=None, customer=None):
         raise AssertionError("gate ran despite skipGate — recovery must bypass it")
     monkeypatch.setattr(srv, "gate", gate_must_not_run)
 
     status, body = _post(f"{gated_url}/api/preview", {**_EMAIL_PAYLOAD, "skipGate": True})
     assert status == 200
-    assert body["disposition"] == "reply" and body["confidence"] == "green"
+    # yellow, not green: no correction log for this tenant ⇒ empty shelf ⇒ never a one-tap send.
+    # What this test is about is the RECOVERY reaching the engine at all, which it still does.
+    assert body["disposition"] == "reply" and body["confidence"] == "yellow"

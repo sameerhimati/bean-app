@@ -12,7 +12,8 @@ from __future__ import annotations
 import difflib
 import json
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bean.paths import corrections_path
@@ -138,6 +139,16 @@ class Correction:
     edit_ratio: float | None = None  # 0..1 magnitude of an edit (0 = untouched, 1 = full rewrite)
     note: str = ""  # 💬 the operator's free-text comment on this reply — the strongest, why-bearing signal
     liked: bool = False  # 👍 quick positive reinforcement — "good job Bean", learn from this win
+    # When this correction was recorded (UTC ISO, stamped by `record`). Every other log on the volume
+    # had one and this one did not, so there was no learning RATE — no way to tell whether the
+    # operator is teaching Bean more this week or has quietly stopped, which is the single earliest
+    # signal that the loop has died. Dating a row meant joining email_id back to inbox.jsonl's
+    # `received_at`, which only covered the emails that hadn't yet aged out of the inbox.
+    #
+    # Empty on every row written before this field existed. Readers must treat "" as unknown rather
+    # than as the epoch: a chart that plants 128 undated corrections on 1970-01-01 is worse than one
+    # that says where its history starts.
+    ts: str = ""
     # Free-dict extension point. Known keys: model_category (the bucket the model picked — a
     # relabel is any row where it differs from `category`), email_subject, email_body (the email
     # context few-shot learns from). 'recategorize' is reserved for a future standalone-relabel
@@ -145,11 +156,21 @@ class Correction:
     meta: dict = field(default_factory=dict)
 
 
+# Field names `load` will accept off disk. Derived from the dataclass, never hand-listed, so a new
+# field can't be added to Correction and forgotten here (which would drop it on every read).
+_FIELD_NAMES = frozenset(f.name for f in fields(Correction))
+
+
 def record(correction: Correction, *, log_path: Path = DEFAULT_LOG) -> Correction:
-    """Tag edit kind (if an edit) and append one JSON line to the correction log."""
+    """Stamp the time, tag edit kind (if an edit), and append one JSON line to the correction log.
+
+    A caller-supplied `ts` is kept as-is so a replay or a backfill can write a row with its real
+    time rather than the time it was re-imported."""
     if correction.action == "edit" and correction.original_draft is not None and correction.final_text is not None:
         correction.edit_kind = classify_edit(correction.original_draft, correction.final_text)
         correction.edit_ratio = edit_ratio(correction.original_draft, correction.final_text)
+    if not correction.ts:
+        correction.ts = datetime.now(timezone.utc).isoformat()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(asdict(correction), sort_keys=True) + "\n")
@@ -161,6 +182,17 @@ def load(log_path: Path = DEFAULT_LOG) -> list[Correction]:
 
     Absent ⇒ `[]` (a new customer). Present-but-unreadable ⇒ `CorrectionsCorruptError`, naming the
     line, so the caller can refuse the request rather than draft as an untaught Bean.
+
+    UNKNOWN KEYS ARE DROPPED, and that is a deploy safety property rather than laxness. This used to
+    be `Correction(**json.loads(line))`, so a row carrying a field this build had never heard of
+    raised TypeError → CorrectionsCorruptError → a 503 on /api/learning, /api/corrections,
+    /api/stats and every draft. Which means adding ANY field to this dataclass silently made the
+    previous image un-rollbackable: deploy, take one correction, roll back, and Bean refuses to
+    read the operator's brain. Filtering to known names makes a rollback merely lossy (the new
+    field reads as its default) instead of fatal, for this field and every future one. The
+    fail-loud stance is unchanged for the failure that actually matters — a line that is corrupt,
+    truncated or not JSON still raises, because silence there is indistinguishable from having
+    learned nothing.
     """
     if not log_path.exists():
         return []
@@ -173,8 +205,9 @@ def load(log_path: Path = DEFAULT_LOG) -> list[Correction]:
         if not line.strip():
             continue
         try:
-            out.append(Correction(**json.loads(line)))
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            row = json.loads(line)
+            out.append(Correction(**{k: v for k, v in row.items() if k in _FIELD_NAMES}))
+        except (json.JSONDecodeError, TypeError, ValueError, AttributeError) as exc:
             raise CorrectionsCorruptError(f"{log_path}:{lineno} is unreadable: {exc}") from exc
     return out
 

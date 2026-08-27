@@ -87,7 +87,8 @@ def _image_block(path: str) -> dict:
     }
 
 
-def _log_usage(model: str, usage: Usage, purpose: str) -> None:
+def _log_usage(model: str, usage: Usage, purpose: str, customer: str | None = None,
+               cache_ttl: str | None = None) -> None:
     """Append one line to the per-customer usage log — tokens + cost signal per REAL model call, so
     Bean's spend is inspectable over time (GET /api/learning's read-surface sibling). Called only
     from the live `AnthropicModel` path (FakeModel has no real token counts, so it never lands here),
@@ -95,27 +96,38 @@ def _log_usage(model: str, usage: Usage, purpose: str) -> None:
     product, so an OSError is swallowed. `purpose` is the forced tool's name (classify/assess/… ),
     which the call already knows — no end-to-end plumbing needed.
 
-    KNOWN CONSTRAINT — no customer argument: `usage_path()` below is called with no customer, so
-    every line lands under `default_customer()` regardless of whose request triggered the call.
-    This is a real gap, not an oversight: `Model.structured()` (the Protocol above) has no customer
-    parameter, and `AnthropicModel` instances are cached as singletons keyed by model id only
-    (`_LIVE`, bottom of this file) and shared across every caller in the process. Threading a
-    customer through cleanly means widening the `Model` protocol + both implementations + every
-    call site (gate.py, engine.py — none of
-    which currently know or need to know the customer) — real plumbing, not a one-line fix, and out
-    of scope for a logging call. Harmless today: `bean/server.py` sets one `CUSTOMER =
-    default_customer()` constant per process (see bean/paths.py's MULTITENANCY TRIGGER), so
-    `usage_path()`'s implicit default and the caller's actual customer are always the same value —
-    there is exactly one tenant per process. It becomes wrong the moment a single process serves two
-    customers concurrently, at which point every call's cost gets attributed to whichever customer
-    happens to be `default_customer()`, silently. Do not paper over that day with a module-level
-    mutable "current customer" — that just moves the same bug from this log to every log. Fix it for
-    real by widening `Model.structured()`."""
+    `customer` names whose volume this line lands on. It used to be absent, so every line landed
+    under `default_customer()` regardless of whose request triggered the call — harmless while
+    `bean/server.py` set one `CUSTOMER` constant per process, and silently wrong the moment one
+    process served two tenants, which is exactly when a cost report starts being read.
+
+    WHY THE CONSTRUCTOR AND NOT `Model.structured()`: the note that stood here said to fix this by
+    widening the protocol. Widening it is worse. The customer is a property of the CLIENT, not of
+    the call — every call an adapter makes belongs to the same tenant for the adapter's whole life —
+    so a per-call parameter would make every call site restate a constant, and it would drag
+    `FakeModel` (which never writes here, having no real token counts) into carrying a field it has
+    no use for. So `AnthropicModel`/`ModelAdapter` take it at construction and pass it down, and
+    `structured()` is untouched. The singleton cache is keyed on `(model_id, customer)` for the same
+    reason — two tenants sharing a process must not share a client that knows only one of their
+    names.
+
+    Still NOT a module-level mutable "current customer": that was the right warning and it stands.
+    It would move this bug into every log rather than fix it. `None` keeps the old implicit default,
+    which is correct for the single-tenant path and for tests."""
     # `cache_write` is not decoration. Total prompt = cache_creation + cache_read + input_tokens, so
     # without it you cannot tell "the prefix was never cached" from "it cached and then expired" —
     # both look like cache_read: 0. Bean shipped 28 production calls with a 0% hit rate and no way to
     # see why. Below a model's minimum cacheable prefix the API silently declines to cache (Haiku 4.5
     # wants 4,096 tokens; Bean's prefix is ~2,262), and it reports that by leaving this field at 0.
+    #
+    # `cache_ttl` is what makes the write PRICEABLE. Anthropic bills a cache write at 1.25x input
+    # for the 5-minute TTL and 2.0x for the 1-hour one, and the response says nothing about which
+    # was used — only the request knew. bean/usage.py priced every write at 1.25x on the grounds
+    # that Bean had only ever requested the default, and left a note that this constant must become
+    # per-line data the day that changed. bean/adapter.py now requests 1h, so it is that day.
+    # Recording it per line (rather than flipping the constant) keeps the ~1,600 historical lines
+    # priced correctly instead of retroactively marking them all up 1.6x. Absent ⇒ 5-minute, which
+    # is true of every line written before this field existed.
     line = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "model": model,
@@ -125,8 +137,10 @@ def _log_usage(model: str, usage: Usage, purpose: str) -> None:
         "cache_write": usage.cache_creation_input_tokens,
         "purpose": purpose,
     }
+    if cache_ttl:
+        line["cache_ttl"] = cache_ttl
     try:
-        path = usage_path()
+        path = usage_path(customer)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, sort_keys=True) + "\n")
@@ -144,10 +158,13 @@ def _tool_input(resp, tool_name: str) -> dict:
 class AnthropicModel:
     """Live Anthropic client. One per model id; the SDK client is cheap to hold."""
 
-    def __init__(self, model: str, temperature: float | None = None):
+    def __init__(self, model: str, temperature: float | None = None, *, customer: str | None = None):
         import anthropic  # imported lazily so unit tests need no SDK/key
 
         self.name = model
+        # Whose volume this client's usage lines land on. See _log_usage for why it lives here
+        # rather than on structured().
+        self.customer = customer
         # None → omit the param → the SDK default (1.0), which production uses (natural drafts).
         # The eval sets temperature=0 for a DETERMINISTIC run so a single-run score is a real gate,
         # not a sample of a temperature-1.0 model (where one case flipping HIGH↔LOW is just noise).
@@ -188,7 +205,7 @@ class AnthropicModel:
                 cache_read_input_tokens=getattr(u, "cache_read_input_tokens", 0) or 0,
             ),
         )
-        _log_usage(self.name, result.usage, tool["name"])
+        _log_usage(self.name, result.usage, tool["name"], self.customer)
         return result
 
 
@@ -216,13 +233,19 @@ class FakeModel:
 
 
 # Lazily-built singletons so the live default path doesn't spin up a client until used.
-_LIVE: dict[str, AnthropicModel] = {}
+#
+# Keyed on (model_id, customer), not model id alone. A client carries the tenant its usage is billed
+# to (_log_usage), so a cache keyed only by model would hand tenant B the client built for tenant A
+# and quietly file B's spend under A's name — the exact silent misattribution the customer argument
+# exists to close. Two tenants in one process cost two clients; an SDK client is cheap to hold.
+_LIVE: dict[tuple[str, str | None], AnthropicModel] = {}
 
 
-def live_model(model_id: str) -> AnthropicModel:
-    if model_id not in _LIVE:
-        _LIVE[model_id] = AnthropicModel(model_id)
-    return _LIVE[model_id]
+def live_model(model_id: str, customer: str | None = None) -> AnthropicModel:
+    key = (model_id, customer)
+    if key not in _LIVE:
+        _LIVE[key] = AnthropicModel(model_id, customer=customer)
+    return _LIVE[key]
 
 
 def has_api_key() -> bool:

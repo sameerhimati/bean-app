@@ -153,12 +153,19 @@ async function loadNotebook() {
     return await r.json();
   } catch (e) { return null; }
 }
-async function saveNotebook(nb) {
+// `source` says where the edit came from ('chat' when Bean proposed it and she confirmed, else
+// 'editor'). It rides in a HEADER, not the body — the body IS the notebook, and a stray key in it
+// would be pushed through Notebook.from_dict on the server.
+async function saveNotebook(nb, source) {
   let r;
   try {
     r = await fetch('/api/notebook', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'If-Match': _notebookEtag || '' },
+      headers: {
+        'Content-Type': 'application/json',
+        'If-Match': _notebookEtag || '',
+        'X-Bean-Source': source === 'chat' ? 'chat' : 'editor',
+      },
       body: JSON.stringify(nb),
     });
   } catch (e) {
@@ -276,11 +283,18 @@ function recordCorrection(payload) {
 }
 
 // ---------- Header ----------
-function TopBar({ onOpenAdmin, onOpenNotebook, onTryEmail, onReopenOnboarding, onOpenTeach, teachLeft, connected }) {
+function TopBar({ onOpenInbox, onOpenAdmin, onOpenStats, onOpenNotebook, onTryEmail, onReopenOnboarding, onOpenTeach, teachLeft, connected, whatsNew }) {
   return React.createElement('header', { className: 'topbar' },
     React.createElement('div', { className: 'brand' },
-      React.createElement(window.BeanMark, { size: 30, bob: true }),
-      React.createElement('div', null,
+      React.createElement(window.PlayfulMark, { size: 44, title: 'Press me — me make a coffee' }),
+      // The wordmark is the way home, the way it is in every other app — and the mark beside it is
+      // NOT. Two jobs, deliberately split down the middle of the brand: pressing the bean brews,
+      // pressing the words goes to the inbox. Rolling them together would mean either losing the
+      // Beanary or making "go home" a coin flip.
+      React.createElement('button', {
+        type: 'button', className: 'brand-home', onClick: onOpenInbox,
+        title: 'Back to your inbox', 'aria-label': 'Back to your inbox',
+      },
         React.createElement('div', { className: 'wordmark' }, 'Bean.'),
         React.createElement('div', { className: 'tagline' }, 'inbox triage')
       )
@@ -298,7 +312,15 @@ function TopBar({ onOpenAdmin, onOpenNotebook, onTryEmail, onReopenOnboarding, o
         React.createElement('span', { className: 'proton-dot' }),
         connected ? 'Connected' : 'Finish setup'
       ),
-      onTryEmail && React.createElement('button', { className: 'teach-btn', onClick: onTryEmail, title: 'Paste a real customer email and watch Bean triage it live' }, '✎ Paste email'),
+      // State on the left of the rule, actions on the right — six controls read as two groups
+      // rather than one undifferentiated row.
+      React.createElement('span', { className: 'topbar-sep', 'aria-hidden': true }),
+      // NO ICONS on these five. They used to carry ✎ 🫘 📓 📊 ⚙ — two text glyphs and three
+      // full-colour emoji, so a row of identical buttons rendered in two different weights and in
+      // a palette (emoji blue, emoji red) that appears nowhere else in Bean. The colour ones also
+      // shift with the OS emoji font, which is not a thing a brand should hand to Apple. The words
+      // were already doing the work; the bean beside the wordmark is the only mark this row needs.
+      onTryEmail && React.createElement('button', { className: 'teach-btn', onClick: onTryEmail, title: 'Paste a real customer email and watch Bean triage it live' }, 'Paste email'),
       // Teaching Bean is walking her notebook — going over what Bean inferred from her mail, one
       // claim at a time. Always present (there is always something to refine), with a "N left" hint
       // only mid-walk, so a half-finished 45-card review advertises its own resume.
@@ -309,9 +331,22 @@ function TopBar({ onOpenAdmin, onOpenNotebook, onTryEmail, onReopenOnboarding, o
       onOpenTeach && React.createElement('button', {
         className: 'teach-btn', onClick: onOpenTeach, title: 'Go over what Bean learned from your mail — one thing at a time, and tell me what me got right',
         style: teachLeft ? { color: 'var(--bean)', borderColor: 'var(--bean)' } : undefined,
-      }, '🫘 Teach Bean' + (teachLeft ? ' (' + teachLeft + ' left)' : '')),
-      onOpenNotebook && React.createElement('button', { className: 'teach-btn', onClick: onOpenNotebook, title: 'Read and edit Bean’s brain — your buckets, standard answers, facts and judgment' }, '📓 Notebook'),
-      onOpenAdmin && React.createElement('button', { className: 'teach-btn', onClick: onOpenAdmin, title: 'Bean’s policy — when to check with you, what me knows about your store' }, '⚙ Settings')
+      },
+        'Teach Bean',
+        // A badge, not "(43 left)". The words cost ~45px and that was exactly enough to push
+        // Settings onto a second row; the count reads as a count either way.
+        teachLeft ? React.createElement('span', { className: 'teach-count', title: teachLeft + ' cards left' }, teachLeft) : null),
+      onOpenNotebook && React.createElement('button', { className: 'teach-btn', onClick: onOpenNotebook, title: 'Read and edit Bean’s brain — your buckets, standard answers, facts and judgment' }, 'Notebook'),
+      onOpenStats && React.createElement('button', { className: 'teach-btn', onClick: onOpenStats, title: 'What Bean has actually done with your mail — and the time it saved you' }, 'Report'),
+      onOpenAdmin && React.createElement('button', {
+        className: 'teach-btn', onClick: onOpenAdmin,
+        title: whatsNew
+          ? 'Me learned something new — “' + whatsNew.title + '”'
+          : 'Bean’s policy — when to check with you, what me knows about your store',
+      }, 'Settings',
+        // The dot is the whole discoverability plan. A changelog buried in Settings, with nothing
+        // pointing at it, tells her about new features only after she has already found them.
+        whatsNew ? React.createElement('span', { className: 'new-dot', 'aria-label': 'something new' }) : null)
     )
   );
 }
@@ -333,6 +368,47 @@ async function modelFetchError(r, where) {
     return e;
   }
   return new Error(where + ' ' + r.status);
+}
+
+// Re-draft ONE conversation so a single reply answers everything still open in it. Server-side this
+// rewrites inbox.jsonl (the new verdict, plus `rolled_into` on the earlier messages), so the caller
+// re-fetches the inbox rather than patching state by hand — the log is the source of truth.
+async function redraftEmail(emailId) {
+  const r = await fetch('/api/redraft', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email_id: emailId }),
+  });
+  if (!r.ok) {
+    const err = await modelFetchError(r, 'POST /api/redraft');
+    // 409 is a real answer, not a fault: there is nothing else waiting in that conversation.
+    if (r.status === 409) err.nothingToDo = true;
+    throw err;
+  }
+  return await r.json();
+}
+
+// One turn of the operator talking to Bean about her notebook. Returns the message object the
+// transcript renders — an `answer` with cites, or a `proposal` she has to confirm.
+//
+// This endpoint READS the notebook and never writes it. Applying an approved proposal goes through
+// saveNotebook below, the one ETag-guarded writer, exactly like every other change to her brain.
+async function askBean(message, transcript) {
+  const r = await fetch('/api/chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, transcript: transcript || [] }),
+  });
+  if (!r.ok) {
+    const err = await modelFetchError(r, 'POST /api/chat');
+    // Carry a line Bean can SAY. A chat that answers a rate limit with "POST /api/chat 429" is
+    // talking to a developer, not to the operator.
+    err.beanMessage = r.status === 429
+      ? 'Me needs a breath — try that again in a moment.'
+      : r.status === 503
+        ? 'Me has no notebook to talk about yet.'
+        : 'Me couldn’t reach my brain just then — say that again?';
+    throw err;
+  }
+  return await r.json();
 }
 
 async function previewEmail(input, opts) {
@@ -381,6 +457,9 @@ function applyResult(res, base) {
     return { ...base, filed: true, gateKind: res.kind, gateReason: res.reason,
              category: 'Filed / FYI', summary: res.reason || 'No reply needed.' };
   }
+  // Set when a later message in the same conversation was drafted to answer this one too, so this
+  // row folds into that draft instead of standing as a second near-duplicate reply to write.
+  base = { ...base, rolledInto: res.rolled_into || '' };
   // The engine stores a situation bucket + groundedness (green/yellow/red) + the sources it cited.
   // Mapped onto the view model DraftView renders — green→high, yellow→low, red→flag. A RED may
   // still carry a draft attempt: it is kept and rendered, never a faked confident reply.
@@ -408,7 +487,16 @@ async function loadInbox() {
       subject: item.subject || '(no subject)',
       time: item.received_at || '',
       body: (item.body || '').split(/\n\s*\n/).map(s => s.trim()).filter(Boolean),
-      thread: [], orders: [],
+      // The quoted conversation this email arrived with. This used to be hardcoded `[]`, so the
+      // "↩ 3 msgs" pill and the draft screen's "Earlier from …" block only ever rendered for the
+      // baked fixtures and NEVER for real mail — 108 of her 410 emails carry one. The writer
+      // (bean/inbound.py) was right, the API served it, and the last hop dropped it on the floor.
+      thread: item.thread || [],
+      // The same history, unpacked by bean/quoting.py into the real messages it contains:
+      // [{who, when, text, side}], oldest first. `thread` is one raw blob that hid up to thirteen
+      // messages behind its quote markers, which is why every count derived from it read "1".
+      conversation: item.conversation || [],
+      orders: [],
     }));
   } catch (e) { return []; }  // offline/empty: fall back to window.EMAILS
 }
@@ -437,6 +525,49 @@ async function loadGateProposals() {
 // The raw correction log, browsable (GET /api/corrections) — the operator view of what Bean has
 // learned. Each row: what the operator did + whether it became a usable exemplar vs a takeover
 // (teaches nothing). Empty offline/pre-loop. Passcode-gated (it carries their mail + replies).
+// What changed in BEAN — the product. A static file in web/, so there is no endpoint: the app
+// already serves this directory, and a changelog that describes the code should ship with it.
+//
+// ⚠️ Distinct from loadNotebookHistory below, and the two must not be confused: that one is what
+// changed in HER NOTEBOOK, this one is what changed in the software. Same word, different subject.
+async function loadWhatsNew() {
+  try {
+    const r = await fetch('/whats-new.json');
+    if (!r.ok) throw new Error('GET /whats-new.json ' + r.status);
+    const d = (await r.json()) || {};
+    const entries = (d.entries || []).filter(e => e && e.date && e.title);
+    // Newest first, and sorted here rather than trusting the file's order — the file is hand-edited.
+    return entries.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  } catch (e) { return []; }  // a READ of a static file; nothing is lost if it can't load
+}
+
+// The newest entry she has NOT seen, or null. Drives the dot on the ⚙ Settings button — a changelog
+// whose job is telling her about new features fails if it is buried somewhere she never opens.
+function whatsNewUnread(entries) {
+  if (!entries || !entries.length) return null;
+  let seen = '';
+  try { seen = localStorage.getItem('bean_whatsnew_seen') || ''; } catch (e) { return null; }
+  return String(entries[0].date) > seen ? entries[0] : null;
+}
+
+function markWhatsNewSeen(entries) {
+  if (!entries || !entries.length) return;
+  // Private browsing or storage disabled. The only cost is the dot coming back, so there is
+  // nothing to tell her and nothing to retry.
+  try { localStorage.setItem('bean_whatsnew_seen', String(entries[0].date)); } catch (e) {}
+}
+
+// Every change ever made to her notebook, newest first. Distinct from loadCorrections above:
+// corrections are feedback on DRAFTS; this is edits to the brain those drafts come from.
+async function loadNotebookHistory() {
+  try {
+    const r = await fetch('/api/notebook/history');
+    if (!r.ok) throw new Error('GET /api/notebook/history ' + r.status);
+    const d = (await r.json()) || {};
+    return { changes: d.changes || [], count: d.count || 0 };
+  } catch (e) { return { changes: [], count: 0 }; }  // a READ; nothing is lost if it can't load
+}
+
 async function loadCorrections() {
   try {
     const r = await fetch('/api/corrections');
@@ -514,7 +645,7 @@ function PasteView({ onSubmit, onBack }) {
   return React.createElement('div', { className: 'draft-view', style: { maxWidth: 640, margin: '0 auto' } },
     React.createElement('button', { className: 'back-btn', onClick: onBack }, '← inbox'),
     React.createElement('div', { className: 'greet-card', style: { marginBottom: 18 } },
-      React.createElement(window.BeanMark, { size: 50, bob: true, className: 'greet-bean' }),
+      React.createElement(window.PlayfulMark, { size: 50, className: 'greet-bean', title: 'Press me — me do a little roast' }),
       React.createElement('div', { className: 'greet-text' },
         React.createElement('h1', null, 'Try a real email'),
         React.createElement('p', null, 'Paste a customer email and I’ll triage it against your knowledge — draft, confidence, and why. I never autosend.')
@@ -534,7 +665,15 @@ function PasteView({ onSubmit, onBack }) {
         React.createElement('button', {
           className: 'admin-add-btn', onClick: canSubmit ? go : undefined, disabled: !canSubmit,
           style: { opacity: canSubmit ? 1 : 0.5, cursor: canSubmit ? 'pointer' : 'default' },
-        }, busy ? 'Bean is thinking…' : 'Ask Bean →')
+        },
+          // The one wait in the app the operator triggers on purpose, so it gets the mark inline:
+          // a button that only changes its words reads as frozen, one that is visibly roasting reads
+          // as working. `mode: roast` at 20px — a dripper this small is three pixels of noise.
+          busy
+            ? React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 9 } },
+                React.createElement(window.BeanRoast, { size: 20, mode: 'roast' }),
+                'Bean is thinking…')
+            : 'Ask Bean →')
       )
     )
   );
@@ -607,13 +746,19 @@ function inboxFacets(emails, statusMap) {
   };
 }
 
-function InboxRow({ email, status, onOpen }) {
+function InboxRow({ email, status, onOpen, onClear, covers }) {
   const c = email.filed ? FILED_STYLE : window.CONF[email.confidence];
   const done = status && status !== 'pending';
   return React.createElement('button', {
     className: 'inbox-row' + (done ? ' is-done' : ''),
     onClick: () => onOpen(email.id),
     style: { borderLeft: `4px solid ${c.dot}` },
+    // The demo tour's only hook into the inbox (web/bean-tour.jsx). It picks the row to point at by
+    // CONFIDENCE, never by id, because which email lands in which bucket is the engine's call and
+    // moves whenever the demo fixture is regenerated. Filed mail reads 'filed', not its confidence:
+    // it is in the collapsed lane, and a tour that scrolls to something the visitor cannot see is
+    // worse than one that skips the step.
+    'data-conf': email.filed ? 'filed' : email.confidence,
   },
     React.createElement('div', { className: 'row-avatar', style: { background: c.bg, color: c.color } },
       email.from.name.split(' ').map(n => n[0]).join('').slice(0, 2)
@@ -622,9 +767,22 @@ function InboxRow({ email, status, onOpen }) {
       React.createElement('div', { className: 'row-line1' },
         React.createElement('span', { className: 'row-from' }, email.from.name),
         React.createElement(window.CategoryTag, null, email.category),
-        email.thread && email.thread.length > 0 && React.createElement('span', {
+        // The real message count. This was `thread.length + 1`, and since `thread` is always a
+        // ONE-element list holding the whole quoted history, that pill read "↩ 2 msgs" on every
+        // email that had ever been replied to — including a thirteen-message chain.
+        window.msgCount(email) > 1 && React.createElement('span', {
           className: 'thread-pill', title: 'Part of an ongoing conversation',
-        }, '↩ ' + (email.thread.length + 1) + ' msgs')
+        }, '↩ ' + window.msgCount(email) + ' msgs'),
+        // They wrote again before anyone answered. The count is the thing worth seeing from the
+        // list: it is how long someone has been waiting, and this one draft answers all of it.
+        // Worded as a fact about the customer, because that is true whether or not Bean grouped
+        // the draft: mail triaged before conversations existed still shows the chase, it just does
+        // not fold. "This draft answers all of them" is only claimed where it is actually the case
+        // — inside the draft view, by ConversationStrip.
+        covers > 1 && React.createElement('span', {
+          className: 'chase-pill',
+          title: 'They wrote ' + covers + ' times and none of it has been answered yet',
+        }, 'wrote ' + covers + '× · no reply')
       ),
       React.createElement('div', { className: 'row-subject' }, email.subject),
       React.createElement('div', { className: 'row-snippet' }, email.summary)
@@ -637,7 +795,27 @@ function InboxRow({ email, status, onOpen }) {
               style: { color: FILED_STYLE.color, background: FILED_STYLE.bg } },
               window.friendlyKind(email.gateKind))
           : React.createElement(window.ConfidenceBadge, { level: email.confidence, size: 'sm' }),
-      React.createElement('span', { className: 'row-time' }, email.time)
+      React.createElement('span', { className: 'row-time', title: email.time },
+        window.beanTimeLabel(email.time)),
+      // Clear it without opening it. She answers plenty of this mail in Proton, and plenty more
+      // she simply never wants Bean to have drafted — before this, both cost her a click into the
+      // draft view and a button ("Take it over") whose name claims something she didn't do.
+      //
+      // A SPAN, not a button: `.inbox-row` is itself a <button>, and a nested button is invalid
+      // HTML that browsers reparent out of the row. role+tabIndex+key handling gives the same
+      // affordance without the nesting.
+      //
+      // Filed mail is excluded on purpose — the FYI lane has its own one-tap purge, and two
+      // different clears on one row is two things to think about.
+      !done && !email.filed && onClear && React.createElement('span', {
+        className: 'row-clear', role: 'button', tabIndex: 0,
+        title: 'Clear this one — me stops showing it, and me learns nothing from it',
+        onClick: ev => { ev.stopPropagation(); onClear(email.id); },
+        onKeyDown: ev => {
+          if (ev.key !== 'Enter' && ev.key !== ' ') return;
+          ev.stopPropagation(); ev.preventDefault(); onClear(email.id);
+        },
+      }, 'Clear')
     )
   );
 }
@@ -646,18 +824,174 @@ function statusLabel(s) {
   return s === 'approved' ? '✓ Sent' : s === 'handled' ? '✓ Handled' : s === 'skipped' ? 'Snoozed' : '';
 }
 
-function InboxGroup({ level, emails, status, onOpen }) {
+// --- conversations ------------------------------------------------------------------------------
+// One customer writing two or three times before anyone answers. Measured on real traffic: 81 of
+// 224 senders wrote more than once, and 145 of 186 consecutive same-sender pairs landed within 72h.
+// She sends ONE reply to those, so the queue must show her one thing to act on, not three rows.
+//
+// The keying mirrors bean/conversation.py exactly — sender address plus the subject with every
+// reply prefix peeled. Peeled repeatedly, because a long chain accretes them
+// ("RE: [EXTERNAL] Re: Fwd: …"), and the address is what stops identical subjects from different
+// customers collapsing into one conversation.
+const THREAD_PREFIX_RE = /^\s*((re|fwd|fw|aw|sv)\s*:|\[[^\]]{1,20}\]\s*)+/i;
+
+function conversationKey(email) {
+  let s = (email.subject || '').trim();
+  for (let prev = null; prev !== s; ) { prev = s; s = s.replace(THREAD_PREFIX_RE, '').trim(); }
+  return ((email.from && email.from.email) || '').trim().toLowerCase() + '\n' + s.toLowerCase();
+}
+
+// Every email that shares `email`'s conversation, oldest first. Includes `email` itself, so a lone
+// message returns a one-element list and every caller can treat both cases the same way.
+function conversationOf(email, emails) {
+  const key = conversationKey(email);
+  return (emails || []).filter(e => conversationKey(e) === key).sort((a, b) => -byNewestFirst(a, b));
+}
+
+// The ids one action should cover: this email plus any earlier ones its draft was written to answer.
+// Approving a conversation's draft has to mark the whole conversation, or the rows it folded in sit
+// in the queue forever with no way to act on them — they no longer render a draft of their own.
+function conversationIds(email, emails) {
+  return conversationOf(email, emails)
+    .filter(e => e.id === email.id || e.rolledInto === email.id)
+    .map(e => e.id);
+}
+
+// Is this row already answered by another row in the same list? Only when the email it was folded
+// into is actually PRESENT — otherwise a filter lens, or a sibling she has already sent, would make
+// a message vanish with nothing left to open. Silent-hide is the worse trust failure; when in doubt
+// the row stands on its own.
+//
+// Note what this does NOT do: fold on conversation membership alone. `rolledInto` means a later
+// draft was actually WRITTEN to answer this message. Mail triaged before conversations existed has
+// no such draft, and hiding it behind one that never addressed it would ghost a real customer.
+function folded(email, emails) {
+  return !!email.rolledInto && (emails || []).some(e => e.id === email.rolledInto);
+}
+
+// How many messages of this conversation are still waiting on a reply — counting the ones Bean
+// never grouped. This is a fact about what the CUSTOMER did, so it is true for mail triaged before
+// any of this existed, which is why the badge is computed here and not read off `rolledInto`.
+// Reported only against the newest open message, so a pile-up is flagged once, not once per row.
+function unansweredCount(email, emails, status) {
+  const open = conversationOf(email, emails).filter(
+    e => !e.filed && (!status[e.id] || status[e.id] === 'pending')
+  );
+  if (!open.length || open[open.length - 1].id !== email.id) return 0;
+  // She answers plenty of mail in Proton without ever marking it here, so "no status" is NOT proof
+  // nobody replied. The quoted history is: if the last message inside this email is one of OURS,
+  // they were answered and then wrote back — a back-and-forth, not a chase. Mirrors
+  // conversation.store_spoke_last, and like it, only a POSITIVE identification counts ('unknown'
+  // attribution must not be read as a reply, or a real chase gets silently downgraded).
+  const conv = email.conversation || [];
+  if (conv.length && conv[conv.length - 1].side === 'other') return 0;
+  return open.length;
+}
+
+if (typeof window !== 'undefined') {
+  Object.assign(window, { conversationKey, conversationOf, conversationIds, folded, unansweredCount });
+}
+
+// Newest first. Mail we cannot date sorts to the BOTTOM rather than the top: an unreadable Date
+// header is not evidence that something just arrived, and floating it above real new mail would put
+// the least trustworthy row in the most important position. Never dropped — every email renders.
+function byNewestFirst(a, b) {
+  const ta = window.beanTimeMs(a.time);
+  const tb = window.beanTimeMs(b.time);
+  if (ta === null && tb === null) return 0;
+  if (ta === null) return 1;
+  if (tb === null) return -1;
+  return tb - ta;
+}
+
+// The main lane: everything awaiting her, in arrival order, confidence carried by colour per row.
+// One customer's unanswered conversation, as ONE thing to act on.
+//
+// The row she taps is the newest message — that is where the draft lives, and where a reply belongs.
+// The earlier ones fold underneath it rather than sitting in the stream as separate errands, because
+// she is going to send exactly one reply. They stay one tap away: ⚠️ folding is only honest while the
+// card that swallowed them SHOWS what it swallowed, so the expander is not a nicety, it is the thing
+// that makes hiding them allowed at all.
+//
+// `redraftable` is the mail Bean never grouped — triaged before conversations existed, so its draft
+// only ever read the last message. One tap fixes that conversation and no others; a sweep would
+// spend real money on mail she may never reopen.
+function ConversationCard({ members, status, onOpen, onClear, onRedraft, busy }) {
+  const [open, setOpen] = useState(false);
+  const newest = members[members.length - 1];
+  const earlier = members.slice(0, -1);
+  const redraftable = earlier.some(e => e.rolledInto !== newest.id);
+  const h = React.createElement;
+
+  return h('div', { className: 'convo-card' },
+    h(InboxRow, { email: newest, status: status[newest.id], onOpen, onClear, covers: members.length }),
+    h('div', { className: 'convo-card-foot' },
+      h('button', {
+        type: 'button', className: 'convo-more', onClick: () => setOpen(o => !o),
+        'aria-expanded': open,
+      }, (open ? '▾ ' : '▸ ') + earlier.length + ' earlier from ' + newest.from.name.split(' ')[0]),
+      redraftable && h('button', {
+        type: 'button', className: 'convo-redraft', disabled: !!busy,
+        onClick: () => onRedraft && onRedraft(newest),
+        title: 'Bean drafted these one at a time. Write one reply that answers all of them.',
+      }, busy
+        ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 7 } },
+            window.BeanRoast ? h(window.BeanRoast, { size: 16, mode: 'roast' }) : null, 'thinking…')
+        : '↻ one reply for all ' + members.length)
+    ),
+    open && h('div', { className: 'convo-card-rows' },
+      // No Clear on the folded rows: clearing the card's newest message covers the whole
+      // conversation (bean-root setOne fans out over conversationIds), so a second control here
+      // would offer to clear a part of something that only ever moves as a whole.
+      earlier.slice().reverse().map(e => h(InboxRow, {
+        key: e.id, email: e, status: status[e.id], onOpen,
+      }))
+    )
+  );
+}
+
+function ChronoGroup({ emails, status, onOpen, onClear, onRedraft, redraftBusy }) {
   if (!emails.length) return null;
-  const c = window.CONF[level];
+  // Build the stream out of ENTRIES: a lone email, or a whole conversation collapsed into one card.
+  // Grouping is by the same key the server uses (window.conversationKey), so what the queue treats
+  // as one conversation is exactly what one draft was written to answer.
+  const byKey = new Map();
+  const entries = [];
+  [...emails].sort(byNewestFirst).reverse().forEach(e => {           // oldest→newest within a card
+    const key = conversationKey(e);
+    const open = !status[e.id] || status[e.id] === 'pending';
+    // Only mail still awaiting her groups. A conversation she has already actioned has nothing left
+    // to collapse, and folding a handled row under an open one would hide work she finished.
+    if (!open) { entries.push({ single: e }); return; }
+    if (byKey.has(key)) { byKey.get(key).members.push(e); return; }
+    const entry = { key, members: [e] };
+    byKey.set(key, entry);
+    entries.push(entry);
+  });
+
+  const rows = entries
+    .map(en => (en.single || en.members.length === 1
+      ? { at: en.single || en.members[0], single: en.single || en.members[0] }
+      : { at: en.members[en.members.length - 1], members: en.members }))
+    .sort((a, b) => byNewestFirst(a.at, b.at));
+
   return React.createElement('section', { className: 'inbox-group' },
     React.createElement('div', { className: 'group-head' },
-      React.createElement('span', { className: 'group-dot', style: { background: c.dot } }),
-      React.createElement('h2', null, c.label),
-      React.createElement('span', { className: 'group-blurb' }, c.blurb),
-      React.createElement('span', { className: 'group-count' }, emails.length)
+      React.createElement('span', { className: 'group-dot', style: { background: 'var(--bean)' } }),
+      React.createElement('h2', null, 'Your inbox'),
+      React.createElement('span', { className: 'group-blurb' }, 'newest first — colour says how sure me is'),
+      React.createElement('span', { className: 'group-count' }, rows.length)
     ),
     React.createElement('div', { className: 'group-rows' },
-      emails.map(e => React.createElement(InboxRow, { key: e.id, email: e, status: status[e.id], onOpen }))
+      rows.map(r => (r.members
+        ? React.createElement(ConversationCard, {
+            key: r.at.id, members: r.members, status, onOpen, onClear, onRedraft,
+            busy: redraftBusy === r.at.id,
+          })
+        : React.createElement(InboxRow, {
+            key: r.single.id, email: r.single, status: status[r.single.id], onOpen, onClear,
+            covers: unansweredCount(r.single, emails, status),
+          })))
     )
   );
 }
@@ -686,7 +1020,8 @@ function FiledGroup({ emails, status, onOpen, onClearFiled }) {
       }, 'Clear FYI')
     ),
     open && React.createElement('div', { className: 'group-rows' },
-      emails.map(e => React.createElement(InboxRow, { key: e.id, email: e, status: status[e.id], onOpen }))
+      [...emails].sort(byNewestFirst).map(e =>
+        React.createElement(InboxRow, { key: e.id, email: e, status: status[e.id], onOpen }))
     )
   );
 }
@@ -772,7 +1107,36 @@ function InboxFilterBar({ facets, filter, onChange, shown, total }) {
   );
 }
 
-function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHigh, onClearFiled }) {
+// "What me can do now", on the morning screen instead of three taps into Settings.
+//
+// ONE entry — the newest she has not seen. A changelog that dumps five entries on the inbox is a
+// wall she scrolls past; one thing she can actually read is a thing she might actually try. The rest
+// stay in Settings, and "See everything me changed" is the door to them (it opens the same tab the
+// ⚙ dot pointed at, which is what marks the whole list seen).
+//
+// Dismiss marks it seen for good — same localStorage key as the Settings tab, so acknowledging it
+// here does not leave the dot burning there.
+function WhatsNewCard({ entry, onDismiss, onMore }) {
+  const h = React.createElement;
+  return h('div', { className: 'whatsnew-card', role: 'note' },
+    window.PlayfulMark ? h(window.PlayfulMark, { size: 34, className: 'whatsnew-bean' }) : null,
+    h('div', { className: 'whatsnew-body' },
+      h('div', { className: 'whatsnew-kicker' }, 'What me can do now'),
+      h('h3', null, entry.title),
+      h('p', null, entry.body),
+      h('div', { className: 'whatsnew-foot' },
+        entry.where ? h('span', { className: 'whatsnew-where' }, '→ ' + entry.where) : null,
+        onMore ? h('button', { type: 'button', className: 'whatsnew-more', onClick: onMore },
+          'See everything me changed') : null
+      )
+    ),
+    h('button', {
+      type: 'button', className: 'whatsnew-x', onClick: onDismiss, 'aria-label': 'Got it',
+    }, '\u00d7')
+  );
+}
+
+function Inbox({ status, pasted, filter, onFilterChange, onOpen, onClear, onClearHandled, onApproveAllHigh, onClearFiled, onRedraft, redraftBusy, whatsNew, onWhatsNewDismiss, onWhatsNewMore, danceKey }) {
   const emails = window.EMAILS;
   const isOpen = e => !status[e.id] || status[e.id] === 'pending';
   // --- The morning summary counts what ARRIVED, always the whole inbox, never the lens — otherwise a
@@ -798,9 +1162,6 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHig
   const vOpen = vEmails.filter(isOpen);
   const vFiled = [...vPastedFiled, ...vOpen.filter(e => e.filed)];
   const vPending = vOpen.filter(e => !e.filed);
-  const vHigh = vPending.filter(e => e.confidence === 'high');
-  const vLow = vPending.filter(e => e.confidence === 'low');
-  const vFlag = vPending.filter(e => e.confidence === 'flag');
   const vDone = vEmails.filter(e => status[e.id] && status[e.id] !== 'pending');
   const totalCount = emails.length + pastedFiled.length;
   const shownCount = vEmails.length + vPastedFiled.length;
@@ -809,9 +1170,23 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHig
     + ((filter && filter.statuses) || []).length > 0;
 
   return React.createElement('div', { className: 'inbox' },
+    // What changed in BEAN. It lived only behind ⚙ Settings with a dot on it, which asks her to
+    // notice a dot, open a settings page, and find a tab — three steps to be told about a feature
+    // she has not been told about yet. So it comes to her, on the one screen she opens every
+    // morning. Still not a modal: it sits ABOVE the greeting, it never blocks the queue, and one
+    // tap dismisses it for good (localStorage, same key the Settings tab marks).
+    whatsNew && React.createElement(WhatsNewCard, {
+      entry: whatsNew, onDismiss: onWhatsNewDismiss, onMore: onWhatsNewMore,
+    }),
     // Greeting / triage summary
     React.createElement('div', { className: 'greet-card' },
-      React.createElement(window.BeanMark, { size: 58, bob: true, className: 'greet-bean' }),
+      // One brew when she lands, and only when bean-root says this is the session's first landing
+      // (see its `dancedRef`). Not on every return from a draft: the inbox remounts each time, and a
+      // mark that brews twenty times a morning is wallpaper, not a surprise.
+      React.createElement(window.PlayfulMark, {
+        size: 58, className: 'greet-bean', autoPlay: danceKey,
+        title: 'Press me — me do a little roast',
+      }),
       React.createElement('div', { className: 'greet-text' },
         allDone
           ? React.createElement(React.Fragment, null,
@@ -824,7 +1199,11 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHig
               React.createElement('h1', null,
                 window.operatorName() ? 'Morning, ' + window.operatorName() + '.' : 'Morning.'),
               React.createElement('p', null,
-                React.createElement('b', null, pending.length + ' emails'), ' came in. Me sorted them, surest first: ',
+                // Describes the ORDER the rows are actually in. This said "me sorted them, surest
+                // first" when the inbox was three confidence lanes; it is now newest-first, and a
+                // greeting that describes an ordering the page doesn't use is a small lie in the
+                // one place the operator is told what Bean did.
+                React.createElement('b', null, pending.length + ' emails'), ' came in, newest first: ',
                 React.createElement('b', { style: { color: window.CONF.high.color } }, high.length + ' ready'), ' to send, ',
                 React.createElement('b', { style: { color: window.CONF.low.color } }, low.length + ' worth a look'), ', and ',
                 React.createElement('b', { style: { color: window.CONF.flag.color } }, flag.length + ' me\'s escalating'), ' to you. Me never autosend.',
@@ -849,22 +1228,42 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHig
       React.createElement('span', null, 'No mail matches these filters. '),
       React.createElement('button', { className: 'inbox-filter-clear', onClick: () => onFilterChange({}) }, 'Clear filters')
     ),
-    React.createElement(InboxGroup, { level: 'high', emails: vHigh, status, onOpen }),
-    React.createElement(InboxGroup, { level: 'low', emails: vLow, status, onOpen }),
-    React.createElement(InboxGroup, { level: 'flag', emails: vFlag, status, onOpen }),
+    // ONE STREAM, newest first — the way mail actually arrives.
+    //
+    // This used to be three lanes by confidence ("surest first"). That ordering optimised for
+    // blitzing the greens, and it cost the operator the thing an inbox is FOR: knowing what just
+    // came in. A customer who wrote an hour ago sat below one who wrote yesterday because Bean felt
+    // surer about the older one, and there was no way to see the morning in order.
+    //
+    // Confidence has not gone anywhere — it moved from POSITION to MARKING. Every row still carries
+    // the coloured left border, the tinted avatar and the confidence badge, so the mix is readable
+    // at a glance without dictating the reading order. The greeting above still counts the lanes,
+    // and "Approve all N ready" still does the blitz in one tap.
+    React.createElement(ChronoGroup, { emails: vPending, status, onOpen, onClear, onRedraft, redraftBusy }),
     React.createElement(FiledGroup, { emails: vFiled, status, onOpen, onClearFiled }),
     // Already-handled, collapsed at bottom
     (() => {
       const done = vDone;
       if (!done.length) return null;
+      // Everything she has finished with, and the one tap that makes the screen actually empty.
+      // The sweep counts only what the SERVER will delete (approved + handled), never the snoozed
+      // rows that also live in this lane — they mean "come back to this", and a count that included
+      // them would promise a deletion the server correctly refuses to make.
+      const sweepable = done.filter(e => ['approved', 'handled'].indexOf(status[e.id]) !== -1);
       return React.createElement('section', { className: 'inbox-group done-group' },
         React.createElement('div', { className: 'group-head' },
           React.createElement('span', { className: 'group-dot', style: { background: '#C7BCA8' } }),
           React.createElement('h2', null, 'Handled today'),
-          React.createElement('span', { className: 'group-count' }, done.length)
+          React.createElement('span', { className: 'group-count' }, done.length),
+          onClearHandled && sweepable.length > 0 && React.createElement('button', {
+            type: 'button', className: 'clear-fyi', style: { marginLeft: 'auto' },
+            onClick: onClearHandled,
+            title: 'Take these off the screen for good. Snoozed mail stays, and what me learned from them stays.',
+          }, 'Clear ' + sweepable.length + ' handled')
         ),
         React.createElement('div', { className: 'group-rows' },
-          done.map(e => React.createElement(InboxRow, { key: e.id, email: e, status: status[e.id], onOpen }))
+          [...done].sort(byNewestFirst).map(e =>
+            React.createElement(InboxRow, { key: e.id, email: e, status: status[e.id], onOpen }))
         )
       );
     })()
@@ -872,11 +1271,13 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onApproveAllHig
 }
 
 window.Inbox = Inbox;
+window.WhatsNewCard = WhatsNewCard;
 window.TopBar = TopBar;
 window.PasteView = PasteView;
 // The pure filter helpers — exported so the component and the JS-eval test share one implementation.
 window.applyInboxFilters = applyInboxFilters;
 window.inboxFacets = inboxFacets;
+window.byNewestFirst = byNewestFirst;
 // Delete the FYI (gate-filed) mail server-side. The server keeps a volume backup and only ever
 // removes filed lines (never a customer email), so this is a one-tap cleanup, not a risky purge.
 async function clearFiled() {
@@ -885,4 +1286,13 @@ async function clearFiled() {
   return r.json();  // { ok, removed, kept }
 }
 
-window.beanStore = { loadStatus, upsertStatus, loadConfig, saveConfig, configSettled, defaultConfig, loadNotebook, saveNotebook, recordCorrection, flushCorrectionOutbox, previewEmail, loadInbox, loadLearning, loadGateProposals, loadCorrections, loadReply, loadReviewProgress, saveReviewProgress, clearFiled };
+// Delete the mail she has already actioned. The server picks the ids off status.json itself and
+// never trusts a list from here — see _handle_clear_handled for why that matters on real customer
+// mail. Throws on any non-ok so the caller can say so rather than silently claiming a clean sweep.
+async function clearHandled() {
+  const r = await fetch('/api/clear-handled', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+  if (!r.ok) throw new Error('POST /api/clear-handled ' + r.status);
+  return r.json();  // { ok, removed, kept }
+}
+
+window.beanStore = { loadStatus, upsertStatus, loadConfig, saveConfig, configSettled, defaultConfig, loadNotebook, saveNotebook, recordCorrection, flushCorrectionOutbox, previewEmail, askBean, redraftEmail, loadInbox, loadLearning, loadGateProposals, loadCorrections, loadNotebookHistory, loadWhatsNew, whatsNewUnread, markWhatsNewSeen, loadReply, loadReviewProgress, saveReviewProgress, clearFiled, clearHandled };

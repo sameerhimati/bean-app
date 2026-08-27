@@ -52,6 +52,14 @@ data/
 !web/favicon.png
 !web/apple-touch-icon.png
 !web/og-bean.png
+# A 70-byte 1x1 transparent pixel, the fixture behind tests/test_images.py and
+# tests/test_customer_memory.py. It survived in THIS repo only because it was tracked before the
+# rule above existed — tracked beats ignored, so nothing ever complained. A fresh export does not
+# inherit that: the public tree is built by copying `git ls-files` into a clean clone, where the
+# file is untracked, `*.png` applies, and `git add -A` drops it in silence. Two test modules then
+# fail on a clone with a FileNotFoundError that says nothing about why. Caught on 2026-08-26 by
+# diffing the staged export against the private tree, one file short.
+!tests/fixtures_pixel.png
 
 # os
 .DS_Store

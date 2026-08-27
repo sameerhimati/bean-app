@@ -81,6 +81,10 @@ const EMPTY = {
   // genuinely null until something has been distilled, which is the state worth booting against.
   '/api/status': {}, '/api/config': {}, '/api/notebook': null, '/api/notebook/review': {},
   '/api/inbox': [], '/api/learning': {}, '/api/corrections': [], '/api/meta': {},
+  // Not an API — a static file in web/, fetched on mount to decide whether the ⚙ Settings button
+  // shows its "something new" dot. `{entries: []}` is the honest empty shape: a deployment with no
+  // release notes yet has nothing to announce, and must not show a dot promising otherwise.
+  '/whats-new.json': { entries: [] },
 };
 const unstubbed = [];
 window.fetch = (url, opts) => {
@@ -103,6 +107,22 @@ dom.virtualConsole.on('jsdomError', e => errors.push('uncaught: ' + (e && (e.det
 window.addEventListener('error', e => errors.push('window.onerror: ' + (e.message || e)));
 window.addEventListener('unhandledrejection', e => errors.push('unhandled rejection: ' + (e.reason && e.reason.message || e.reason)));
 
+// ⚠️ web/bean-data.jsx IS GITIGNORED, so it does not exist in a clone — and Bean.html loads it by
+// name. Reading it blind is an ENOENT that kills the whole harness, which is why every jsdom test
+// in this repo failed for anyone who cloned it, silently, from the day the public tree was cut.
+//
+// Absent is not an error state, it is the DEPLOYED state: the server synthesizes this file when no
+// baked fixture is present (bean/server.py:_serve_data_jsx), and a real deployment therefore always
+// runs the synthesized one. So the missing-file path is the shipped path, and standing in for it
+// here makes the harness MORE faithful rather than more forgiving — the baked file on a developer's
+// laptop is the special case.
+const dataStandIn = 'window.EMAILS = []; window.CONFIG = {}; window.SETTINGS = {};';
+const readOrSynthesize = (src) => {
+  const p = path.join(WEB, src);
+  if (src === 'bean-data.jsx' && !fs.existsSync(p)) return dataStandIn;
+  return fs.readFileSync(p, 'utf8');
+};
+
 runScript(fs.readFileSync(path.join(WEB, 'vendor', 'react.production.min.js'), 'utf8'));
 runScript(fs.readFileSync(path.join(WEB, 'vendor', 'react-dom.production.min.js'), 'utf8'));
 global.React = window.React; global.ReactDOM = window.ReactDOM;
@@ -112,7 +132,7 @@ global.React = window.React; global.ReactDOM = window.ReactDOM;
 const loaded = [];
 for (const src of SCRIPTS) {
   const before = errors.length;
-  runScript(fs.readFileSync(path.join(WEB, src), 'utf8'));
+  runScript(readOrSynthesize(src));
   if (errors.length > before) { errors.push('...while loading ' + src); break; }
   loaded.push(src);
 }

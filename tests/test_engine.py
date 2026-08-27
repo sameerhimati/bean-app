@@ -25,9 +25,18 @@ def _email() -> Email:
     return Email(id="e1", sender_name="A", sender_email="a@x.com", subject="return", body="can I return this?")
 
 
-def _run(model_output: dict) -> DraftResult:
+def _shelf() -> list[Exemplar]:
+    """One neighbour, so these tests exercise the CITATION rule in isolation. An empty shelf is its
+    own downgrade now (see test_green_on_an_empty_shelf_is_never_one_tap), and passing [] here would
+    make every green-path test pass for the wrong reason."""
+    return [Exemplar(email_id="past1", subject="return", body="can I send this back?",
+                     reply="Of course — within 30 days.", bucket=None, score=0.42)]
+
+
+def _run(model_output: dict, exemplars: list[Exemplar] | None = None) -> DraftResult:
     model = FakeModel({DRAFT_TOOL["name"]: model_output})
-    return draft_email(_nb(), [], [], None, _email(), model)
+    shelf = _shelf() if exemplars is None else exemplars
+    return draft_email(_nb(), shelf, [], None, _email(), model)
 
 
 def test_green_with_citation_stays_green():
@@ -98,3 +107,39 @@ def test_contract_rejects_uncited_green():
 def test_contract_rejects_yellow_without_reason():
     with pytest.raises(ValueError):
         DraftResult("e", "B", Grounding.YELLOW, draft="hi", citations=[], why_unsure=[])
+
+
+# ---- the empty-shelf rule --------------------------------------------------------------------
+
+def test_green_on_an_empty_shelf_is_never_one_tap():
+    """The asymmetry this closes: the CITATION rule was enforced in code, but "you have nothing of
+    hers to lean on" was only ever a sentence in the prompt — one honesty guarantee a rule, the
+    other a polite request, in a product whose whole thesis is not trusting the model's self-report.
+
+    An empty shelf means she has never answered anything like this. The notebook may still cover it,
+    so this is not an automatic red — but green means "approve blind", and that is a promise she has
+    made this exact call before."""
+    r = _run({"bucket": "Returns & refunds", "draft": "Yes, within 30 days.",
+              "citations": ["notebook:Returns & refunds"], "confidence": "green", "why_unsure": []},
+             exemplars=[])
+    assert r.confidence == Grounding.YELLOW
+    assert any("no close past reply" in w for w in r.why_unsure), \
+        "the downgrade must say WHY — an unexplained yellow is not calibration"
+
+
+def test_an_empty_shelf_does_not_force_red():
+    """Coercion stays monotonic and minimal: the rule removes the one-tap claim, it does not throw
+    away a usable draft. Over-refusing is its own failure — a Bean that flags everything saves no
+    time (see bean/outcomes.py)."""
+    r = _run({"bucket": "Returns & refunds", "draft": "Yes, within 30 days.",
+              "citations": ["notebook:Returns & refunds"], "confidence": "yellow",
+              "why_unsure": ["not sure on timing"]}, exemplars=[])
+    assert r.confidence == Grounding.YELLOW
+    assert r.draft == "Yes, within 30 days."
+
+
+def test_a_shelf_does_not_rescue_an_uncited_green():
+    """Both rules apply independently — having a neighbour is not a substitute for citing one."""
+    r = _run({"bucket": "Returns & refunds", "draft": "Yes.", "citations": [],
+              "confidence": "green", "why_unsure": []})
+    assert r.confidence == Grounding.YELLOW

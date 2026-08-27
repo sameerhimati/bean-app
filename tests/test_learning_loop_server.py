@@ -65,7 +65,7 @@ def preview(tmp_path, monkeypatch):
     cfg_path.write_text(json.dumps(sw_config().to_dict()), encoding="utf-8")
     monkeypatch.setattr(srv, "CONFIG_PATH", cfg_path)
     monkeypatch.setattr(srv, "STATUS_PATH", tmp_path / "status.json")
-    monkeypatch.setattr(srv, "gate", lambda email, rules=None: GateResult("reply"))
+    monkeypatch.setattr(srv, "gate", lambda email, rules=None, customer=None: GateResult("reply"))
     # The server resolves its paths once at import (BEAN_DATA_DIR predates the process in prod), so
     # patch the constant, not just the env — exactly as the CONFIG_PATH seam does. `corrections_path()`
     # below reads the patched env, so the file the test writes and the file the server reads are one.

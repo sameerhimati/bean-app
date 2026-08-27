@@ -158,7 +158,7 @@ def memory_server(tmp_path, monkeypatch):
     monkeypatch.setattr(srv, "CONFIG_PATH", cfg_path)
 
     from bean.gate import GateResult
-    monkeypatch.setattr(srv, "gate", lambda email, rules=None: GateResult("reply", "customer", "A real customer."))
+    monkeypatch.setattr(srv, "gate", lambda email, rules=None, customer=None: GateResult("reply", "customer", "A real customer."))
 
     # NOT a stub of the engine: the real _run_engine runs, so the history read in bean/server.py —
     # the seam under test — actually executes. Only the network is swapped for a fake.

@@ -27,9 +27,23 @@ from bean.llm import (
     _tool_input,
 )
 
-# ephemeral = the standard ~5-minute prompt cache. The notebook prefix recurs on every email in a
-# session, so a warm call reads it instead of re-billing it (verify via cache_read_input_tokens).
-_CACHE_CONTROL = {"type": "ephemeral"}
+# The notebook prefix recurs on every email, so a warm call reads it instead of re-billing it
+# (verify via cache_read_input_tokens).
+#
+# ONE HOUR, not the default five minutes, and the default was measured to be a NET LOSS. Her mail
+# does not arrive in bursts: the median gap between drafts is 28 minutes, 67% of gaps are under an
+# hour and only 16% are under five. So at the 5-minute TTL the prefix expired between almost every
+# pair of emails and Bean paid the 1.25x write over and over without ever reading it back — 68
+# writes against 12 reads across 80 August drafts, $2.17 actual versus $2.10 with caching removed
+# entirely. A 1-hour TTL costs 2x on the write and simulates to $1.85, because it converts that
+# 67% of gaps from a re-write into a read.
+#
+# The lesson worth keeping is the general one: a cache TTL is a bet about the ARRIVAL PATTERN, not
+# a tuning knob. Nobody measured the gap distribution before picking the default, and the default
+# happened to be wrong for a one-operator support inbox in a way that no error could ever surface —
+# it just cost money quietly. If Bean ever serves a high-volume tenant whose mail really does
+# arrive in bursts, re-measure rather than assume this constant transfers.
+_CACHE_CONTROL = {"type": "ephemeral", "ttl": "1h"}
 
 
 def _with_cache(system: list[dict]) -> list[dict]:
@@ -53,11 +67,15 @@ class ModelAdapter:
     replay verifier grades against; `None` omits the param (SDK default 1.0) for natural production
     drafts."""
 
-    def __init__(self, model: str, *, api_key: str | None = None, temperature: float | None = None):
+    def __init__(self, model: str, *, api_key: str | None = None, temperature: float | None = None,
+                 customer: str | None = None):
         import anthropic  # lazy, like llm.AnthropicModel — no SDK/key needed for FakeModel tests
 
         self.name = model
         self.temperature = temperature
+        # Whose volume this adapter's usage lines land on (llm._log_usage). Per-instance, not
+        # per-call: a tenant's adapter serves only that tenant for its whole life.
+        self.customer = customer
         # Running usage across this adapter's calls — lets a caller (the replay verifier) report
         # spend and, crucially, confirm the notebook prefix actually cached (cache_read > 0).
         self.total = Usage()
@@ -103,7 +121,10 @@ class ModelAdapter:
             cache_creation_input_tokens=self.total.cache_creation_input_tokens + result.usage.cache_creation_input_tokens,
             cache_read_input_tokens=self.total.cache_read_input_tokens + result.usage.cache_read_input_tokens,
         )
-        _log_usage(self.name, result.usage, tool["name"])
+        # Report the TTL only when caching was actually requested — a `cache_system=False` call
+        # writes no cache, and stamping a TTL on it would price a write that never happened.
+        _log_usage(self.name, result.usage, tool["name"], self.customer,
+                   _CACHE_CONTROL.get("ttl", "5m") if cache_system else None)
         return result
 
 

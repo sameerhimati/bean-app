@@ -55,6 +55,10 @@ function ConfidenceBadge({ level, size = 'md' }) {
 }
 
 function CategoryTag({ children }) {
+  // No label ⇒ no tag. An email whose bucket is empty was rendering a bare pill — a small blank
+  // lozenge on every row, which reads as a broken control rather than as "uncategorised". Absence
+  // is the honest rendering of absence.
+  if (children === null || children === undefined || children === '') return null;
   return React.createElement('span', { className: 'cat-tag' }, children);
 }
 
@@ -258,4 +262,41 @@ function CopyButton({ text, kind = 'primary', full = false, label = 'Copy draft'
     copied ? 'Copied ✓' : ('⧉ ' + label));
 }
 
-Object.assign(window, { CONF, ConfidenceBadge, CategoryTag, ConfidenceMeter, Btn, Toast, friendlyKind, CopyButton, operatorName, stripMarkdown, draftAsHtml, MD_BOLD_RE: _MD_BOLD });
+// ---- when mail arrived ----------------------------------------------------------------------
+// The operator reads her inbox in HER day, not in Greenwich. Postmark hands us the sender's Date
+// header, so a customer in London and one in Dallas arrive stamped in different zones and the raw
+// string sorts by neither — it is RFC-2822 text ("Thu, 02 Jul 2026 09:12:00 -0700"), which is why
+// it was being rendered verbatim and read as GMT. Parse it to a real instant, then render every
+// one of them in the operator's zone so the inbox reads as one continuous day.
+//
+// Fixed to Central rather than the browser's zone on purpose: the timestamps must match the store's
+// working day, and a laptop that travels (or a phone that guesses wrong) would otherwise re-label
+// every email as she moves. It is one operator's business day, so it is one constant — the day this
+// serves a second store in another zone, it becomes a per-tenant setting, not a guess.
+const BEAN_TZ = 'America/Chicago';
+
+function beanTimeMs(raw) {
+  if (!raw) return null;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : null;  // unparseable → null, never a silent 1970
+}
+
+const _TIME_FMT = { timeZone: BEAN_TZ, hour: 'numeric', minute: '2-digit' };
+const _DATE_FMT = { timeZone: BEAN_TZ, month: 'short', day: 'numeric' };
+
+function beanTimeLabel(raw, now) {
+  const ms = beanTimeMs(raw);
+  // Not a date we can read: show whatever the caller had rather than inventing one. Pasted mail
+  // ("just now") lands here by design.
+  if (ms === null) return raw || '';
+  const d = new Date(ms);
+  const time = d.toLocaleTimeString('en-US', _TIME_FMT);
+  const today = new Date(now === undefined ? Date.now() : now);
+  // Same CENTRAL day, not the same UTC day — otherwise mail from 7pm Central reads as "yesterday"
+  // from the moment it arrives.
+  const sameDay = d.toLocaleDateString('en-US', { timeZone: BEAN_TZ })
+    === today.toLocaleDateString('en-US', { timeZone: BEAN_TZ });
+  return sameDay ? time : d.toLocaleDateString('en-US', _DATE_FMT) + ', ' + time;
+}
+
+Object.assign(window, { CONF, ConfidenceBadge, CategoryTag, ConfidenceMeter, Btn, Toast, friendlyKind, CopyButton, operatorName, stripMarkdown, draftAsHtml, MD_BOLD_RE: _MD_BOLD, BEAN_TZ, beanTimeMs, beanTimeLabel });

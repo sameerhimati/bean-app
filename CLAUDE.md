@@ -53,8 +53,37 @@ checking. That trust loop is the whole moat.
   Bean never holds a mailbox password: the operator forwards their `support@` address to a Postmark
   inbound-parse address and verifies their domain (SPF/DKIM) so replies send *as* their brand.
   Provider-agnostic — works on Gmail, Outlook, and Proton via a custom domain.
-- Secrets in `.env` (just `ANTHROPIC_API_KEY` — never commit). Persistence via `BEAN_DATA_DIR`,
-  tenant directory via `BEAN_CUSTOMER`.
+- Secrets live in `.env`, which is gitignored and untracked — **never commit it, and never paste a
+  value out of it into any file, commit, PR, log line or screenshot, including this one.** What is
+  in there: `ANTHROPIC_API_KEY`, `BEAN_OWNER_PASSCODE` (the author's second secret, for
+  `GET /api/usage` — cost is the author's number, not the operator's), and `BEAN_PASSCODE` (the
+  operator's own passcode, which fronts the whole app).
+  **`BEAN_PASSCODE` is the operator's live mailbox.** Reach for it only when a question genuinely
+  cannot be answered from `/healthz`, `/api/usage`, or the source — those cover most of them. When
+  it is needed, authenticate through the shipped path and hold the session in a cookie jar outside
+  the repo, so the secret never lands in a shell header, a scrollback, or a file:
+
+  ```bash
+  set -a && . ./.env && set +a                      # $BEAN_PUBLIC_URL too — this file names no host
+  JAR=$(mktemp -d)/bean.cookies
+  curl -sc "$JAR" -X POST "$BEAN_PUBLIC_URL/api/auth" \
+    -H 'Content-Type: application/json' -d "{\"passcode\":\"$BEAN_PASSCODE\"}" >/dev/null
+  curl -sb "$JAR" "$BEAN_PUBLIC_URL/api/learning"   # then reuse the jar; rm it when done
+  ```
+
+  The host is a variable here for the same reason `scripts/deploy.sh` stopped hardcoding one: this
+  file is PUBLIC. Naming the operator's live instance beside "one passcode fronts the whole app"
+  and the exact call that opens it hands over the target and the door in one paragraph — no secret
+  leaks, and the posture is still worse. The lockout is real but it is not a reason to publish the
+  address of somebody else's mailbox.
+
+  ⚠️ **`bean/llm.py` calls `load_dotenv()` at import, so everything in `.env` is in the environment
+  of every test too.** Adding `BEAN_PASSCODE` there turned the gate on mid-suite and took 79 tests
+  red on `assert 401` — which also blocks `scripts/preflight.sh`, and therefore every deploy.
+  `tests/conftest.py` now clears the passcodes for every test so the suite never reads ambient
+  state; a test that wants the gate sets it itself.
+
+  Persistence via `BEAN_DATA_DIR`, tenant directory via `BEAN_CUSTOMER`.
 
 ## Hard constraints
 

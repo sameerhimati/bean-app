@@ -12,6 +12,7 @@ function initialView() {
   if (h === 'admin') return { name: 'admin' };
   if (h === 'notebook') return { name: 'notebook' };
   if (h === 'questionnaire') return { name: 'questionnaire' };
+  if (h === 'stats') return { name: 'stats' };
   if (h.indexOf('draft/') === 0) return { name: 'draft', id: h.slice(6) };
   return { name: 'inbox' };
 }
@@ -118,7 +119,7 @@ function Onboarding({ onDone }) {
     },
       // Welcome
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 } },
-        React.createElement(window.BeanMark, { size: 46, bob: true }),
+        React.createElement(window.PlayfulMark, { size: 46, title: 'Press me — me do a little roast' }),
         React.createElement('div', null,
           React.createElement('h1', { style: { margin: 0, fontSize: 22, fontWeight: 600 } }, 'Hi, me Bean 🫘'),
           React.createElement('div', { style: { fontSize: 14, color: 'var(--ink-soft)', marginTop: 2 } },
@@ -194,9 +195,50 @@ function App() {
   // coming back — the whole point of narrowing a 100+ inbox is to work THROUGH the narrowed set, not
   // to have it reset the moment you open one. Ephemeral per session; {} = the un-filtered default.
   const [inboxFilter, setInboxFilter] = useS({});
+  const dancedRef = useR(false);      // has the Beanary played its once-a-session brew yet
   const [cite, setCite] = useS(null); // the tapped citation chip: the raw 'kind:label' string | null
   const [replyEmail, setReplyEmail] = useS(null); // the review-queue "teach the reply" affordance (BeanReply)
   const [toast, setToast] = useS(null); // {expr, msg, onUndo}
+  const [redraftBusy, setRedraftBusy] = useS(null); // the conversation id currently re-drafting
+  // The newest release note she has not read, or null. Drives BOTH the card on the inbox and the
+  // dot on ⚙ Settings — one piece of state, so acknowledging it in either place settles the other.
+  const [whatsNew, setWhatsNew] = useS(null);
+  useE(() => {
+    // Not on the public demo, and only the CARD is withheld — the Settings tab still lists every
+    // release note for anyone who goes looking. The card is written to the operator about her own
+    // habits ("if you already answered someone in your own mail"), and it claims the top of the
+    // page above the greeting. For a visitor who has never seen Bean, the first thing they read
+    // would be a changelog entry for a product they have not been shown yet. Same reasoning as
+    // `onboarded` above, and the same one-line escape: BEAN_DEMO_TENANT is off unless a deployment
+    // sets it, so no real tenant loses a note.
+    if (window.BEAN_DEMO_TENANT) return;
+    let alive = true;
+    window.beanStore.loadWhatsNew().then(list => {
+      if (alive) setWhatsNew(window.beanStore.whatsNewUnread(list));
+    });
+    return () => { alive = false; };
+  }, []);
+
+  // The demo tour (web/bean-tour.jsx). Demo deployments only, once per visitor. Deliberately NOT
+  // hung off `onboarded`: that one is forced true on the demo precisely so the mail-forwarding walk
+  // is skipped, so anything gated on it could never fire here.
+  const [tourDone, setTourDone] = useS(() =>
+    !window.BEAN_DEMO_TENANT || !window.BeanTour || window.beanTourSeen());
+  // Dismissing the inbox card is reading it. Persist the same marker the Settings tab writes (it is
+  // keyed on the NEWEST entry's date, and `whatsNew` is by definition that entry when it is unread),
+  // so the dot does not come back on the next load to announce something she just closed.
+  function dismissWhatsNew() {
+    if (whatsNew) window.beanStore.markWhatsNewSeen([whatsNew]);
+    setWhatsNew(null);
+  }
+  // Bean chat. Lives up here, OUTSIDE the view switch, so the panel and the whole transcript
+  // survive inbox → draft → stats → notebook — she can be told a rule while reading the email that
+  // prompted it. `chatPending` is derived, never stored: a proposal is pending exactly while it is
+  // unanswered, so there is no second source of truth to leave stale.
+  const [chatOpen, setChatOpen] = useS(false);
+  const [chatLog, setChatLog] = useS([]);
+  const [chatBusy, setChatBusy] = useS(false);
+  const chatSeq = useR(0);
   const toastTimer = useR(null);
   const pendingCommit = useR(null); // deferred correction for an undoable action; fires on toast-expiry
   const configLoaded = useR(false); // gate saves until the initial GET resolves (don't PUT the seed)
@@ -209,6 +251,22 @@ function App() {
     if (window.BEAN_DEMO_TENANT) return true;
     try { return !!localStorage.getItem('bean_onboarded'); } catch (e) { return false; }
   });
+
+  // The Beanary hint — "press Bean, he does a little roast".
+  //
+  // ⚠️ Its own key, deliberately NOT hung off `onboarded`. The operator this is FOR finished
+  // onboarding weeks ago, so anything gated on first-run would never fire for the one person who
+  // needs telling. Keyed separately, it shows once for anyone who has not seen it — her included,
+  // on her next load — and never again.
+  const [beanarySeen, setBeanarySeen] = useS(() => {
+    try { return !!localStorage.getItem('bean_beanary_seen'); } catch (e) { return true; }
+  });
+  function dismissBeanary() {
+    setBeanarySeen(true);
+    // Private browsing or storage disabled. The only cost is the hint saying hello again next
+    // time, so there is nothing to tell her and nothing to retry.
+    try { localStorage.setItem('bean_beanary_seen', '1'); } catch (e) {}
+  }
 
   // Hydrate the status map from the server once on mount (async now — server-side, not localStorage).
   useE(() => {
@@ -358,8 +416,15 @@ function App() {
 
   // Every single-email state change goes through here, so this is the one place that has to persist.
   function setOne(id, st) {
-    setStatus(s => ({ ...s, [id]: st }));
-    window.beanStore.upsertStatus(id, st);
+    // One reply, one action — but a conversation's draft answers every message folded into it, and
+    // those rows no longer render a draft of their own. Marking only the one she was looking at
+    // would strand the others in the queue with nothing left to act on. POST /api/status stays
+    // per-id (deliberately, so two devices can't clobber each other's map), so we loop it.
+    // A pasted email isn't in window.EMAILS at all — it has no conversation, and acts on itself.
+    const email = (window.EMAILS || []).find(e => e.id === id);
+    const covered = email ? window.conversationIds(email, window.EMAILS) : [id];
+    setStatus(s => ({ ...s, ...Object.fromEntries(covered.map(i => [i, st])) }));
+    covered.forEach(i => window.beanStore.upsertStatus(i, st));
   }
 
   function nextPendingAfter(id) {
@@ -368,8 +433,11 @@ function App() {
     // A pasted email (recovery/preview) isn't in the fixture list — don't advance into an
     // unrelated fixture draft; send the flow back to the inbox instead.
     if (idx === -1) return null;
-    // Filed mail never auto-advances into view — it's demoted, opened only on purpose.
-    const actionable = e => !e.filed && (!status[e.id] || status[e.id] === 'pending');
+    // Filed mail never auto-advances into view — it's demoted, opened only on purpose. Nor does a
+    // message folded into a later draft: it has no draft of its own to act on, so landing there
+    // after an approve would be a dead end.
+    const actionable = e => !e.filed && !window.folded(e, list)
+      && (!status[e.id] || status[e.id] === 'pending');
     for (let i = idx + 1; i < list.length; i++) {
       if (actionable(list[i])) return list[i].id;
     }
@@ -383,6 +451,7 @@ function App() {
   function open(id) { setView({ name: 'draft', id }); window.scrollTo({ top: 0 }); }
   function back() { setView({ name: 'inbox' }); window.scrollTo({ top: 0 }); }
   function openAdmin() { setView({ name: 'admin' }); window.scrollTo({ top: 0 }); }
+  function openStats() { setView({ name: 'stats' }); window.scrollTo({ top: 0 }); }
   function openNotebook() { setView({ name: 'notebook' }); window.scrollTo({ top: 0 }); }
   // The card-by-card review of the distilled notebook — her approval conversation. Deep-linkable
   // (#questionnaire) because it's the thing to send her a link to after a distillation run. Load her
@@ -409,6 +478,47 @@ function App() {
   // this only holds the citation string — resolving it to a notebook line or a past reply is the
   // sheet's job, and the fetch it needs rides the onLoadReply prop (the moat).
   function openCite(c) { setCite(c); }
+
+  // ---- Bean chat -------------------------------------------------------------------------------
+  // The ONLY fetch in the chat feature. The component is dumb by construction; this is the seam,
+  // and it lives beside saveNotebook so the two never disagree about who writes.
+  const chatId = p => p + (chatSeq.current += 1);
+
+  function askBean(text) {
+    const mine = { id: chatId('u'), from: 'you', text };
+    // The transcript sent is the one she can SEE — snapshotted before her new turn is appended, so
+    // the server is never handed a message it is also being asked to answer.
+    const priorTurns = chatLog.map(m => ({ from: m.from, text: m.from === 'you' ? m.text : (m.claim || m.text) }));
+    setChatLog(l => l.concat([mine]));
+    setChatBusy(true);
+    window.beanStore.askBean(text, priorTurns)
+      .then(reply => setChatLog(l => l.concat([{ ...reply, id: chatId('b'), from: 'bean' }])))
+      .catch(err => setChatLog(l => l.concat([{
+        id: chatId('e'), from: 'bean', kind: 'answer',
+        // Bean says what went wrong in her own voice rather than swallowing it. A chat that silently
+        // drops a turn is one she stops trusting with the next rule change.
+        text: (err && err.beanMessage) || 'Me couldn’t reach my brain just then — say that again?',
+      }])))
+      .then(() => setChatBusy(false), () => setChatBusy(false));
+  }
+
+  // Mark a proposal answered so the launcher's amber dot clears. The card renders its own payoff
+  // row, so nothing is removed from the transcript — she can scroll back and see what she decided.
+  function settleChat(m) {
+    setChatLog(l => l.map(x => (x.id === m.id ? { ...x, settled: true } : x)));
+  }
+
+  function confirmChatProposal(m, claim) {
+    settleChat(m);
+    const { notebook: next, replaced } = window.applyClaim(notebook, m, claim);
+    return saveNotebook(next, 'chat').then(saved => {
+      // Say which of the two things actually happened. The proposal may have named a line that is
+      // no longer there, in which case this was an addition, and telling her it "replaced" it would
+      // be the one lie this whole flow exists to avoid.
+      flashToast(replaced ? 'Swapped it for what you told me before.' : 'Written down. Me follows this now.', 'cheer');
+      return saved;
+    });
+  }
   function tryEmail() { setView({ name: 'paste' }); window.scrollTo({ top: 0 }); }
 
   // Paste → live triage via /api/preview → open the same DraftView a fixture email uses.
@@ -478,6 +588,25 @@ function App() {
   function onReplyFromEmail(email, reply) {
     if (reply && email) record(email, 'teach', { category: email.category, finalText: reply });
     flashToast('Got it — Bean learned from that reply.', 'happy');
+  }
+
+  // CLEAR — the one action that teaches Bean NOTHING, and the reason it exists.
+  //
+  // She answers a lot of this mail in Proton, and a lot more she simply never wanted a draft for.
+  // Before this the only ways off the queue were "Take it over" (logs a `takeover`) and "Snooze"
+  // (logs a `skip`) — both require opening the email, and both write to corrections.jsonl. That log
+  // is the brain: a one-tap gesture used thirty times a morning would bury the corrections that
+  // actually carry judgment under a drift of "she pressed the X button". Measured precedent —
+  // 18 of 21 takeovers already paired with a teach on the same email, so the takeover half of the
+  // pair was recording nothing on its own.
+  //
+  // So: status only. No `record()`. The undo is therefore free — nothing was written to unwrite.
+  // `setOne` fans out over the conversation, so clearing a pile-up clears the pile.
+  function clearOne(id) {
+    setOne(id, 'handled');
+    flashToast('Cleared. Me learns nothing from that one.', 'happy', {
+      onUndo: () => { setOne(id, 'pending'); flashToast('Back in the queue.', 'happy'); },
+    });
   }
 
   function approve(extra) {
@@ -563,6 +692,21 @@ function App() {
     flashToast(`Sent ${highs.length} ready replies. The judgment calls are still yours.`, 'cheer');
   }
 
+  // Empty the Handled lane for good. Confirm-gated like clearFiled (it deletes, even with a volume
+  // backup), and it reloads from disk afterwards so the screen shows what actually survived rather
+  // than an optimistic guess. Snoozed mail is NOT swept — the server refuses it, and the copy here
+  // says so, because "clear handled" eating her later-pile is exactly the surprise that would stop
+  // her ever tapping it again.
+  function clearHandled() {
+    const n = window.EMAILS.filter(e => ['approved', 'handled'].indexOf(status[e.id]) !== -1).length;
+    if (!n) return;
+    if (!window.confirm(`Take ${n} handled email${n === 1 ? '' : 's'} off the screen for good? Snoozed mail stays put, and everything Bean learned from these stays too. Recoverable from a backup.`)) return;
+    window.beanStore.clearHandled().then(res => {
+      window.beanStore.loadInbox().then(live => { window.EMAILS = live; bumpInbox(n2 => n2 + 1); });
+      flashToast(`Cleared ${res.removed} off the screen.`, 'happy');
+    }).catch(() => flashToast("Couldn't clear those — nothing was deleted.", 'sad'));
+  }
+
   // Clear the FYI lane. Confirm-gated (it deletes, even if the server keeps a backup), and it
   // reloads from disk so the count reflects what actually survived — never an optimistic guess.
   function clearFiled() {
@@ -575,9 +719,40 @@ function App() {
     }).catch(() => flashToast("Couldn't clear the filed mail — nothing was deleted.", 'warn'));
   }
 
+  // Re-draft one conversation so a single reply answers all of it. The server rewrites the log
+  // (new verdict + `rolled_into` on the earlier messages), so we re-read it rather than patching
+  // state — an optimistic guess here would show a fold that may not have happened.
+  function redraftConversation(email) {
+    if (redraftBusy) return;
+    setRedraftBusy(email.id);
+    window.beanStore.redraftEmail(email.id)
+      .then(res => window.beanStore.loadInbox().then(live => {
+        if (live && live.length) { window.EMAILS = live; bumpInbox(n => n + 1); }
+        flashToast('One reply now, covering all ' + res.covered + '.', 'cheer');
+      }))
+      .catch(err => flashToast(
+        err && err.nothingToDo
+          ? 'Nothing else is waiting in that one.'
+          : "Couldn't redraft that — nothing was changed.", 'warn'))
+      .then(() => setRedraftBusy(null), () => setRedraftBusy(null));
+  }
+
+  // ONE brew, on the first inbox of the session.
+  //
+  // Owned here rather than in Inbox because Inbox REMOUNTS on every return from a draft — she comes
+  // back to this screen after every email she actions, so a mount-triggered dance would play twenty
+  // times a morning. This ref survives those remounts, so the animation stays what it is meant to
+  // be: a thing that happens once and makes her smile, not a loading spinner with a personality.
+  //
+  // To make it play on every return instead, delete the ref and pass a constant 1.
+  const danceKey = view.name === 'inbox' && !dancedRef.current ? 1 : 0;
+  useE(() => { if (danceKey) dancedRef.current = true; });
+
   let main;
   if (view.name === 'admin') {
-    main = React.createElement(window.AdminView, { config, setConfig, onBack: back });
+    main = React.createElement(window.AdminView, { config, setConfig, onBack: back, whatsNew, onWhatsNewSeen: () => setWhatsNew(null) });
+  } else if (view.name === 'stats') {
+    main = React.createElement(window.StatsView, { config, setConfig, onBack: back });
   } else if (view.name === 'paste') {
     main = React.createElement(window.PasteView, { onSubmit: submitPaste, onBack: back });
   } else if (view.name === 'notebook') {
@@ -596,7 +771,9 @@ function App() {
     // from it once at mount. Two fetches race here (both start on mount); mounting when only the
     // faster one has landed is what white-screened prod.
     main = (reviewProgress === null || !notebookSettled)
-      ? React.createElement('div', { className: 'draft-view', style: { maxWidth: 620, margin: '48px auto', textAlign: 'center', color: 'var(--ink-faint)', padding: '0 20px' } }, 'Finding where you left off…')
+      ? React.createElement('div', { className: 'draft-view', style: { maxWidth: 620, margin: '48px auto', textAlign: 'center', color: 'var(--ink-faint)', padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 } },
+          React.createElement(window.BeanRoast, { size: 64 }),
+          React.createElement('div', null, 'Finding where you left off…'))
       : React.createElement(window.BeanQuestionnaire, {
           notebook, onClose: back,
           initialProgress: reviewProgress,
@@ -616,7 +793,9 @@ function App() {
             React.createElement('div', { style: { fontSize: 14, color: 'var(--ink-faint)', marginTop: 8, lineHeight: 1.5 } },
               'It may have been cleared, or the link points somewhere me can’t see any more.'),
             React.createElement('button', { className: 'back-btn', style: { marginTop: 18 }, onClick: back }, '← inbox'))
-        : React.createElement('div', { style: { color: 'var(--ink-faint)' } }, 'Finding that email…'));
+        : React.createElement('div', { style: { color: 'var(--ink-faint)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 } },
+            React.createElement(window.BeanRoast, { size: 64 }),
+            React.createElement('div', null, 'Finding that email…')));
   } else if (view.name === 'draft') {
     main = React.createElement(window.DraftView, {
       // key on the email id so a new email remounts DraftView — otherwise its useState
@@ -629,7 +808,7 @@ function App() {
       onCite: openCite,
     });
   } else {
-    main = React.createElement(window.Inbox, { status, pasted, filter: inboxFilter, onFilterChange: setInboxFilter, onOpen: open, onApproveAllHigh: approveAllHigh, onClearFiled: clearFiled });
+    main = React.createElement(window.Inbox, { status, pasted, filter: inboxFilter, onFilterChange: setInboxFilter, onOpen: open, onClear: clearOne, onClearHandled: clearHandled, onApproveAllHigh: approveAllHigh, onClearFiled: clearFiled, onRedraft: redraftConversation, redraftBusy, whatsNew, onWhatsNewDismiss: dismissWhatsNew, onWhatsNewMore: openAdmin, danceKey });
   }
 
   // The resume hint on the Teach Bean button — cards left in her notebook walk, or null when she
@@ -638,8 +817,14 @@ function App() {
 
   return React.createElement(React.Fragment, null,
     !onboarded && React.createElement(Onboarding, { onDone: finishOnboarding }),
-    React.createElement('div', { className: 'app-shell' },
-      React.createElement(window.TopBar, { onOpenAdmin: openAdmin, onOpenNotebook: openNotebook, onTryEmail: tryEmail, onReopenOnboarding: reopenOnboarding, onOpenTeach: openQuestionnaire, teachLeft, connected }),
+    // The demo tour. Mounted only on the inbox and only once there is something to point at —
+    // BeanTour resolves its targets in a mount effect, so if it went up beside an inbox that had
+    // not loaded yet it would quietly drop every step that names a row. `window.EMAILS` is the same
+    // list the Inbox renders from, so by the time this is non-empty the rows are in that commit.
+    !tourDone && view.name === 'inbox' && (window.EMAILS || []).length > 0 &&
+      React.createElement(window.BeanTour, { onDone: () => setTourDone(true) }),
+    React.createElement('div', { className: 'app-shell' + (view.name === 'admin' ? ' is-wide' : '') },
+      React.createElement(window.TopBar, { onOpenInbox: back, onOpenAdmin: openAdmin, onOpenStats: openStats, onOpenNotebook: openNotebook, onTryEmail: tryEmail, onReopenOnboarding: reopenOnboarding, onOpenTeach: openQuestionnaire, teachLeft, connected, whatsNew }),
       React.createElement('main', { className: 'app-main' }, main),
       React.createElement(window.Toast, {
         show: !!toast, expr: toast ? toast.expr : 'cheer',
@@ -656,6 +841,33 @@ function App() {
       onClose: () => setCite(null),
       onSaveNotebook: saveNotebook,
       onLoadReply: id => window.beanStore.loadReply(id),
+    }),
+    // The Beanary hint. A quiet nub under the topbar mark, not a modal: it is a party trick, and
+    // interrupting her morning triage to announce one would be the wrong trade. Dismisses on tap.
+    // `tourDone` is true for every real tenant from its initializer, so this reads as it always did
+    // for her — it only keeps the demo's tour bar and this nub from sharing the bottom of a narrow
+    // screen. The hint comes back the moment the tour is finished or skipped.
+    !beanarySeen && onboarded && tourDone && React.createElement('div', {
+      className: 'beanary-hint', role: 'note', onClick: dismissBeanary,
+    },
+      React.createElement('span', null, 'Psst — press me up there and me go to the Beanary. ☕'),
+      React.createElement('button', {
+        type: 'button', className: 'beanary-hint-x', onClick: dismissBeanary, 'aria-label': 'Got it',
+      }, '×')),
+    // Bean chat, OUTSIDE the view switch and after the cite sheet — so the panel and transcript
+    // survive navigation, and a cite chip in a chat answer opens the very same sheet the draft view
+    // opens. The component fetches nothing: every seam it needs is passed in from here.
+    React.createElement(window.BeanChat, {
+      open: chatOpen,
+      onOpen: () => setChatOpen(true),
+      onClose: () => setChatOpen(false),
+      messages: chatLog,
+      thinking: chatBusy,
+      pending: chatLog.filter(m => m.kind === 'proposal' && !m.settled).length,
+      onSend: askBean,
+      onOpenCite: openCite,
+      onConfirmProposal: confirmChatProposal,
+      onDeclineProposal: settleChat,  // writes nothing, on purpose
     }),
     // The review-queue "teach the reply" affordance — node-less by construction, so it can only log a
     // grounded exemplar (onReplyFromEmail), never graft a template.
