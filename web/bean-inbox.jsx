@@ -633,7 +633,19 @@ function PasteView({ onSubmit, onBack }) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const canSubmit = body.trim() && !busy;
+  // POST /api/preview is the ONE route that spends a model call, so BEAN_DEMO_READONLY 404s it and
+  // that is not going to change — a URL anyone can open must not be able to spend money.
+  //
+  // What it used to do about that: nothing, until you pressed the button, at which point the 404
+  // surfaced as "Bean couldn't reach the server — is it running?". Every word of that is wrong here.
+  // The server is fine, it is running, and it refused on purpose — so the one screen where a
+  // visitor is invited to paste in their own real support mail answered a deliberate policy with
+  // what looks like an outage, after they had already typed it out.
+  //
+  // Told up front instead, and the button is off. A demo that cannot do a thing should say so
+  // before the work, not after it.
+  const demoNoPreview = !!window.BEAN_DEMO_TENANT;
+  const canSubmit = body.trim() && !busy && !demoNoPreview;
   async function go() {
     setBusy(true); setErr(null);
     try { await onSubmit({ name, email, subject, body }); }
@@ -647,11 +659,18 @@ function PasteView({ onSubmit, onBack }) {
     React.createElement('div', { className: 'greet-card', style: { marginBottom: 18 } },
       React.createElement(window.PlayfulMark, { size: 50, className: 'greet-bean', title: 'Press me — me do a little roast' }),
       React.createElement('div', { className: 'greet-text' },
-        React.createElement('h1', null, 'Try a real email'),
-        React.createElement('p', null, 'Paste a customer email and I’ll triage it against your knowledge — draft, confidence, and why. I never autosend.')
+        React.createElement('h1', null, demoNoPreview ? 'Not in the demo, sorry' : 'Try a real email'),
+        React.createElement('p', null, demoNoPreview
+          ? 'Triaging a new email means a model call, and this demo is deployed with no API key on '
+            + 'purpose — a link anyone can open should not be able to spend money. The ten emails '
+            + 'in the inbox were run through the real engine before it shipped; every verdict and '
+            + 'draft there is one Bean actually reached, not written by hand. Go read those.'
+          : 'Paste a customer email and I’ll triage it against your knowledge — draft, confidence, and why. I never autosend.')
       )
     ),
-    React.createElement('div', { className: 'email-panel', style: { position: 'static' } },
+    // The form itself is withheld on the demo rather than shown disabled. A greyed-out box still
+    // invites a paste, and the thing a visitor would paste is their own real support mail.
+    !demoNoPreview && React.createElement('div', { className: 'email-panel', style: { position: 'static' } },
       React.createElement(PasteField, { label: 'From — name', value: name, onChange: setName, placeholder: 'e.g. Dana R.' }),
       React.createElement(PasteField, { label: 'From — email', value: email, onChange: setEmail, placeholder: 'dana@example.com' }),
       React.createElement(PasteField, { label: 'Subject', value: subject, onChange: setSubject, placeholder: 'Will the 3-seater fit through a 30-inch doorway?' }),
@@ -1210,7 +1229,19 @@ function Inbox({ status, pasted, filter, onFilterChange, onOpen, onClear, onClea
                 filed.length > 0 ? React.createElement('span', null, ' (Plus ',
                   React.createElement('b', { style: { color: FILED_STYLE.color } }, filed.length + ' filed as FYI'),
                   ' — below, never hidden.)') : null
-              )
+              ),
+              // The demo's one outbound link, in the greeting because that is the line every
+              // visitor reads. ABSOLUTE, to the production host, and that is the whole point: the
+              // demo container has no volume (railway.demo.toml), so a signup posted to its own
+              // /join lands on a filesystem that is discarded on the next restart. Same page, same
+              // form, silently dropped. A waitlist that loses the waitlist is worse than no link.
+              window.BEAN_DEMO_TENANT ? React.createElement('p', { className: 'demo-join' },
+                'Me is not open to everyone yet. ',
+                React.createElement('a', {
+                  href: 'https://bean.itamih.com/join', target: '_blank', rel: 'noopener noreferrer',
+                }, 'Put your name down'),
+                ' and me will come find you.'
+              ) : null
             )
       ),
       !allDone && high.length > 0 && React.createElement('div', { className: 'greet-action' },

@@ -66,7 +66,8 @@ const TOUR_STEPS = [
     title: 'Have a click around.',
     body: 'Open any email to read the draft, edit it, or send it back to me. Nothing here is saved '
         + 'and nothing here is real mail — this store is invented, and the demo forgets you the '
-        + 'moment you close the tab.',
+        + 'moment you close the tab. If you want me on your own inbox, the link is up in the '
+        + 'greeting.',
   },
 ];
 

@@ -159,6 +159,51 @@ const snap = () => {
 const click = (el) => el.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
 const tick = (ms) => new Promise(r => setTimeout(r, ms));
 
+// The two screens that must refuse on a public demo. Both are reached from the top bar, and both
+// ask a visitor for something a demo has no business asking for: one for a paste of their own real
+// support mail (which would spend a model call the demo deliberately cannot make), one for their
+// mailbox's forwarding config. Probed by driving the actual buttons, not by reading state.
+//
+// ⚠️ READ #root, NEVER document.body. This harness appends each .jsx file as a <script> element in
+// the body (that is the point — it is how the browser runs them), and `body.textContent` includes
+// the text inside script elements. So every string literal in the source counts as "on the page":
+// searching the body for 'Nothing to connect here' matches bean-root.jsx's own source whether or
+// not anything rendered, and the first version of these probes passed for exactly that reason
+// while proving nothing. The mounted app lives in #root; the source does not.
+const screen = () => (q('#root') || { textContent: '' }).textContent || '';
+const byText = (sel, text) => Array.from((q('#root') || window.document).querySelectorAll(sel))
+  .find(e => (e.textContent || '').indexOf(text) !== -1);
+const pasteProbe = async () => {
+  const btn = byText('button', 'Paste email');
+  if (!btn) return { reached: false };
+  click(btn);
+  await tick(60);   // a click dispatched from outside React needs a turn before the view swaps
+  const body = screen();
+  return {
+    reached: true,
+    heading: body.indexOf('Not in the demo') !== -1 ? 'refused' : 'invited',
+    form: !!q('.admin-textarea'),
+  };
+};
+const connectProbe = async () => {
+  // A <span>, not a button (bean-inbox.jsx TopBar), so this cannot look for a button role.
+  const pill = q('.proton-pill');
+  if (!pill) return { reached: false };
+  click(pill);
+  // ⚠️ WAIT PAST THE ONBOARDING POLL. It ticks every 4s and auto-dismisses the overlay the moment
+  // /api/inbox has anything in it — which on the demo is always, immediately. Reading at +60ms saw
+  // the panel render and passed while, four seconds later, it closed itself. A refusal that does
+  // not survive its own screen is not a refusal, so this waits long enough to see the second tick.
+  await tick(4600);
+  const body = screen();
+  return {
+    reached: true,
+    refuses: body.indexOf('Nothing to connect here') !== -1,
+    // The literal ask, and the placeholder it would show with no address configured.
+    invites: body.indexOf('Forward to') !== -1 || body.indexOf('your-bean-inbox') !== -1,
+  };
+};
+
 // The inbox arrives over fetch and the tour mounts on the render after it lands, so this needs more
 // than one microtask turn to settle. Then walk the whole tour the way a visitor does — Next until it
 // closes — because "the tour writes nothing" is a claim about what it does, not about how it looks.
@@ -176,19 +221,28 @@ const tick = (ms) => new Promise(r => setTimeout(r, ms));
     if (q('.bean-tour')) walk.push(snap());
   }
   await tick(60);
-  process.stdout.write(JSON.stringify({
-    errors, writes, writesOnArrival,
-    present: first.present, count: first.count, title: first.title, spotConf: first.spotConf,
-    walk,
-    rows: window.document.querySelectorAll('.inbox-row').length,
-    whatsNewCard: !!q('.whatsnew-card'),
-    beanaryHint: hintOnArrival,
-    // After the walk: the bar is gone, the ring went with it, the visitor is marked as told, and the
-    // Beanary nub is allowed back.
+  // Snapshot the inbox END STATE first. The probes below navigate away from it — they click into
+  // the paste screen and then the forwarding overlay — so anything read after them describes a
+  // different view. Doing it the other way round is what made endHint and the row count go false.
+  const endState = {
     endTour: !q('.bean-tour'), endSpot: !q('.bean-tour-spot'),
     endSeen: window.localStorage.getItem('bean_tour_seen'),
     endHint: !!q('.beanary-hint'),
-  }));
+    rows: window.document.querySelectorAll('.inbox-row').length,
+    whatsNewCard: !!q('.whatsnew-card'),
+    join: (() => { const a = q('.demo-join a'); return a ? a.getAttribute('href') : null; })(),
+  };
+  // Order matters: paste first, then the connection pill, because each leaves the app on its screen.
+  const pasteResult = await pasteProbe();
+  const connectResult = await connectProbe();
+  process.stdout.write(JSON.stringify(Object.assign(endState, {
+    errors, writes, writesOnArrival,
+    present: first.present, count: first.count, title: first.title, spotConf: first.spotConf,
+    walk,
+    beanaryHint: hintOnArrival,
+    paste: pasteResult,
+    connect: connectResult,
+  })));
   process.exit(0);
 })();
 """
@@ -290,3 +344,58 @@ def test_the_beanary_hint_waits_for_the_tour_to_finish():
     out = _run(_FULL)
     assert out["present"], "precondition: the tour should be up"
     assert not out["beanaryHint"], "the Beanary hint shared the screen with the tour bar"
+
+
+def test_the_demo_refuses_the_paste_screen_before_anyone_types():
+    """POST /api/preview is the one route that spends a model call, so the demo 404s it forever.
+
+    It used to say nothing until you pressed the button, and then reported the deliberate refusal as
+    "Bean couldn't reach the server — is it running?" — on the one screen that invites a visitor to
+    paste in their own real support mail, after they had already typed it out. Told up front now,
+    and the textarea is not rendered at all: a greyed-out box still invites the paste.
+    """
+    out = _run(_FULL)
+    paste = out["paste"]
+    assert paste["reached"], "could not reach the paste screen — this test would pass vacuously"
+    assert paste["heading"] == "refused", "the demo still offers to triage a pasted email"
+    assert not paste["form"], "the demo still renders a textarea for mail it cannot triage"
+
+
+def test_the_demo_never_asks_a_stranger_to_forward_their_mailbox():
+    """The one that actually matters on a public link.
+
+    This screen exists to talk somebody into pointing their real support address at a forwarding
+    address. On a URL anyone can open that is either nonsense (BEAN_INBOUND_ADDRESS is unset there,
+    so the steps read "forward your mail to you@your-bean-inbox") or, if it were ever set, a working
+    funnel aiming strangers' support mail into somebody else's Bean. Being skipped at first paint is
+    not enough — the connection pill reopens it, so the refusal has to live where the ask does.
+    """
+    out = _run(_FULL)
+    conn = out["connect"]
+    assert conn["reached"], "could not reach the connection pill — this test would pass vacuously"
+    assert conn["refuses"], "the demo did not refuse the forwarding walkthrough"
+    assert not conn["invites"], "the demo still asks a visitor to set up mail forwarding"
+
+
+def test_the_demo_offers_a_way_in_and_points_it_somewhere_that_persists():
+    """The demo's one outbound link, and the reason it is absolute.
+
+    The demo container has NO VOLUME (railway.demo.toml) — /data is the container filesystem and it
+    is discarded on every restart. `POST /api/waitlist` is deliberately left unlocked there because
+    signing up is the one write a visitor legitimately wants to make, so a relative /join would
+    render the same page, take the same form, and drop every name on the next deploy. Silently.
+    A waitlist that loses the waitlist is worse than no link at all.
+    """
+    out = _run(_FULL)
+    href = out["join"]
+    assert href, "the demo shows no way to sign up"
+    assert href.startswith("https://"), (
+        f"the join link is {href!r} — relative means the signup posts to the volume-less demo "
+        "container and is thrown away on the next restart")
+
+
+def test_a_real_tenant_is_not_shown_the_signup_link():
+    """She is already a customer. Inviting her onto her own waitlist is nonsense."""
+    out = _run(_FULL, demo=False)
+    assert out["rows"] > 0, "the inbox failed to render — this test would pass vacuously"
+    assert not out["join"], "the operator was shown the public signup link"

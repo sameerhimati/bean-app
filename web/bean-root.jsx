@@ -80,7 +80,15 @@ function Onboarding({ onDone }) {
   }, []);
 
   // Poll the live inbox while the overlay is open; first real email → celebrate, then auto-advance.
+  //
+  // Not on the demo. This poll means "the operator's forwarding is working — the first real email
+  // just landed", and the demo's inbox is eleven committed fixtures that are ALWAYS there. So it
+  // fires on the first tick and dismisses the panel out from under whoever opened it: the refusal
+  // below rendered correctly and then vanished after four seconds, which reads as a UI bug and
+  // leaves the visitor back where they started. The hooks cannot move below the early return, so
+  // the guard goes in the body.
   useE(() => {
+    if (window.BEAN_DEMO_TENANT) return;
     pollTimer.current = setInterval(() => {
       window.beanStore.loadInbox().then(live => {
         if (live && live.length) {
@@ -102,6 +110,52 @@ function Onboarding({ onDone }) {
     'Paste your Bean address (copied above) into the “Forward to” box. If it asks “Forward from,” pick your support address.',
     'Hit Save. Proton emails a confirmation to activate it — leave that one to me, me’ll take it from there.',
   ];
+
+  // ⚠️ NOT ON THE PUBLIC DEMO. This screen's whole job is to talk somebody into pointing their real
+  // support mailbox at a forwarding address, and a URL anyone can open must never make that ask.
+  // Two ways it goes wrong, one merely embarrassing and one not:
+  //   - BEAN_INBOUND_ADDRESS is unset on the demo service, so `addr` is empty and the steps read
+  //     "forward your mail to you@your-bean-inbox" — nonsense instructions to a stranger.
+  //   - If it were ever set there, the demo would be a working funnel pointing strangers' support
+  //     mail into somebody else's Bean. Nothing in this component can tell those two apart, and the
+  //     safe one is only safe by an env var nobody is watching.
+  // The overlay is reachable on the demo (the connection pill calls reopenOnboarding), so being
+  // skipped at first paint is not enough — it has to be refused here, where the ask actually lives.
+  if (window.BEAN_DEMO_TENANT) {
+    return React.createElement('div', {
+      style: {
+        position: 'fixed', inset: 0, zIndex: 100, overflowY: 'auto',
+        background: 'var(--cream)', padding: '32px 18px',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+      },
+    },
+      React.createElement('div', {
+        style: {
+          width: '100%', maxWidth: 520, background: 'var(--paper)',
+          border: '1.5px solid var(--line)', borderRadius: 20, padding: '26px 26px 24px',
+          boxShadow: 'var(--shadow-lg)', margin: '0 auto',
+        },
+      },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 } },
+          React.createElement(window.PlayfulMark, { size: 46 }),
+          React.createElement('div', null,
+            React.createElement('h1', { style: { margin: 0, fontSize: 22, fontWeight: 600 } }, 'Nothing to connect here'),
+            React.createElement('div', { style: { fontSize: 14, color: 'var(--ink-soft)', marginTop: 2 } },
+              'This is the demo.')
+          )
+        ),
+        React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6, color: 'var(--ink-soft)' } },
+          'On a real Bean this screen walks you through forwarding your support address to it. Me '
+          + 'is not going to ask a stranger to do that, and there is no mailbox on this end to '
+          + 'point at — the store you are looking at is invented and the mail is a fixture.'),
+        React.createElement('p', { style: { fontSize: 14, lineHeight: 1.6, color: 'var(--ink-soft)' } },
+          'Bean connects by forwarding plus domain auth, never by holding your mailbox password. '
+          + 'Works on Gmail, Outlook and Proton with a custom domain.'),
+        React.createElement(window.Btn, { kind: 'ghost', full: true, onClick: () => onDone() },
+          'Back to the inbox')
+      )
+    );
+  }
 
   return React.createElement('div', {
     style: {
