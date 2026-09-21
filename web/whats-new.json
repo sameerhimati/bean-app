@@ -16,6 +16,18 @@
   ],
   "entries": [
     {
+      "date": "2026-09-21",
+      "title": "An open email fits on one screen now",
+      "body": "The buttons stay at the top while you read, so nothing needs a scroll. Copy & mark sent does both in one press: it copies the reply and tells me you sent it (and if you changed it first, me learns from what you changed). Edit right in the draft box, and tell me why just underneath. The customer's latest message is at the top, with the earlier ones folded under it. Should’ve been filed and changing the category are in the ⋯ menu. If you only want to copy without telling me anything, use Copy only on the draft box.",
+      "where": "Any email you open from the inbox"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Me stopped saying “I’ll look into it”",
+      "body": "When your notebook or one of your past replies already has the answer, me now gives it straight instead of promising the customer someone will follow up. If me isn’t sure, me tells you in the box under the draft, not the customer in the reply. Replies are a little shorter too.",
+      "where": "The drafts themselves"
+    },
+    {
       "date": "2026-08-19",
       "title": "Clear an email without opening it",
       "body": "If you already answered someone in your own mail, or you just don't want me on it, press Clear on the row — it goes to Handled and me never asks again. Me learns nothing from a Clear; it is tidying, not you telling me me was wrong. When the Handled pile gets long, one more press clears the lot. Snoozed mail stays put.",

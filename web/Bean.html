@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
     --cream: #F4EEE1;
@@ -30,6 +30,11 @@
     --line: #E7DECE;
     --line-soft: #EFE8DA;
     --bean: #6E4327;
+    --amber: #D39A2C;
+    --amber-ink: #3A2708;
+    /* Bean's own face, and the one prose is read in (the open email and its draft). */
+    --mono: 'Courier Prime', 'Courier New', monospace;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --shadow: 0 1px 2px rgba(58,48,32,.04), 0 6px 18px rgba(58,48,32,.06);
     --shadow-lg: 0 2px 4px rgba(58,48,32,.05), 0 14px 40px rgba(58,48,32,.10);
   }
@@ -589,93 +594,142 @@
   .done-group .inbox-row { background: var(--cream-2); }
 
   /* ---------- Draft view ---------- */
-  .draft-view { animation: fadeUp .25s ease; }
+  /* The open email, the screen she spends her day on. A sticky bar carries the subject, ONE
+     confidence pill and the actions, so grading never costs a scroll; below it the email takes 5 of
+     12 columns and the draft 7, because the draft is what she acts on. Prose — the mail, the draft,
+     her notes — is set in IBM Plex Sans: in a proportional face it runs about a third shorter than
+     in Courier and reads like mail. Bean's Courier stays on the brand, the labels and the pill. */
+  .app-shell.is-draft { max-width: 1440px; }
+  /* The topbar scrolls away here instead of sticking: the draft bar takes the top edge, and two
+     stacked sticky bars would eat a fifth of a laptop screen. */
+  .app-shell.is-draft .topbar { position: static; margin-bottom: 0; background: none; }
+  .draft-view { animation: fadeUp .25s ease; font-family: var(--sans); }
   @keyframes fadeUp { from { transform: translateY(8px); } to { transform: none; } }
   .back-btn {
     background: var(--paper); border: 1.5px solid var(--line); color: var(--ink-soft);
     font-size: 13.5px; font-weight: 800; padding: 8px 14px; border-radius: 999px; cursor: pointer; margin-bottom: 16px;
   }
   .back-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
-  .draft-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 18px; align-items: start; }
+
+  .dv-bar { position: sticky; top: 0; z-index: 20; margin-bottom: 20px; background: rgba(244,238,225,.94); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-bottom: 1.5px solid var(--line); }
+  .dv-bar-in { display: flex; align-items: center; gap: 16px; padding: 12px 0; }
+  .dv-bar .back-btn { margin: 0; flex: none; border: 0; background: none; padding: 6px 4px; border-radius: 8px; font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .dv-title { flex: 1; min-width: 0; }
+  .dv-title h2 { margin: 0; font-family: var(--sans); font-size: 17px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dv-from { font-size: 13px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dv-bar .conf-badge { flex: none; font-family: var(--mono); }
+  .conf-badge.is-filed { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; color: #8A7F6C; background: #F4EFE6; border: 1.5px solid #E4DCCB; }
+  .dv-acts { display: flex; align-items: center; gap: 8px; flex: none; }
+  .dv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 13.5px; font-weight: 600; line-height: 1.2; white-space: nowrap; cursor: pointer; transition: background .12s, border-color .12s; }
+  .dv-btn:hover:not(:disabled) { border-color: var(--ink-faint); }
+  .dv-btn.is-primary { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
+  .dv-btn.is-primary:hover:not(:disabled) { background: #C98E22; border-color: #C98E22; }
+  .dv-btn.is-soft { background: var(--cream-2); border-color: transparent; color: var(--ink-soft); }
+  .dv-btn.is-soft:hover:not(:disabled) { border-color: var(--line); }
+  .dv-btn:disabled { opacity: .6; cursor: default; }
+  .dv-btn:focus-visible, .dv-bar .back-btn:focus-visible, .dv-menu-item:focus-visible, .draft-tool:focus-visible,
+  .sources-head:focus-visible, .mail-earlier-head:focus-visible, .mail-more:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .dv-more { position: relative; }
+  .dv-more-btn { min-width: 40px; font-weight: 700; }
+  .dv-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 25; min-width: 250px; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--paper); border: 1.5px solid var(--line); border-radius: 10px; box-shadow: 0 12px 30px rgba(58,48,32,.14); }
+  .dv-menu-item { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; font-family: var(--sans); font-size: 13.5px; color: var(--ink); cursor: pointer; }
+  .dv-menu-item:hover { background: var(--cream-2); }
+  .dv-menu-narrow { display: none; }
+  .category-picker { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px; }
+  .category-picker-label { font-size: 13.5px; color: var(--ink); }
+  .category-select { font: inherit; font-size: 13.5px; color: var(--ink-soft); background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 8px; cursor: pointer; width: 100%; }
+  .category-select:focus { outline: none; border-color: var(--bean); }
+  .dv-menu-hint { margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--ink-faint); }
+  .dv-notice { margin: 0 0 12px; padding: 8px 12px; font-size: 13px; font-weight: 600; color: #9A6A12; background: #FBF1DA; border: 1.5px solid #EAD6A2; border-radius: 10px; }
+
+  .draft-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; align-items: start; }
   /* A grid item's min-width is `auto`, so it refuses to shrink below its longest unbreakable word.
      Real mail is full of them — a 200-char tracking URL in a marketing email widened this column
      past its 1fr, overflowed the grid, and shoved BOTH panes off-screen (the body clipped at the
      left edge). Same fix as .row-main above: let the column shrink, and let the words break. */
   .draft-grid > * { min-width: 0; }
 
-  .email-panel {
-    background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
-    position: sticky; top: 84px;
-  }
-  .email-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .email-avatar { width: 44px; height: 44px; border-radius: 12px; background: #ece6f7; color: #6d4aff; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
-  /* A long sender name wrapped to two lines and the absolute-width time sat on top of it. The name
-     truncates instead: the address below it and the thread bylines already carry identity, and a
-     collision reads as broken in a way a clipped name does not. */
-  .email-from { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .email-addr { font-size: 12.5px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; }
-  .email-time { margin-left: auto; font-size: 12px; color: var(--ink-faint); font-weight: 700; flex: none; white-space: nowrap; }
-  .email-subject { font-weight: 700; font-size: 18px; line-height: 1.3; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1.5px dashed var(--line); overflow-wrap: anywhere; }
+  .email-panel { background: var(--paper); border: 1.5px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow); }
   .email-body p { margin: 0 0 12px; color: #4a4338; font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
   .email-body p:last-child { margin-bottom: 0; }
   /* Linkified tracking URLs are one enormous "word". Break them rather than let them decide the
      page width. `anywhere` (not break-all) so ordinary prose still wraps on spaces. */
   .email-body a { overflow-wrap: anywhere; }
 
-  .bean-panel { display: flex; flex-direction: column; gap: 16px; }
-  .category-picker { display: flex; align-items: center; gap: 10px; }
-  .category-picker-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); }
-  .category-select { font: inherit; font-size: 13.5px; color: var(--ink-soft); background: var(--paper); border: 1.5px solid var(--line); border-radius: 9px; padding: 6px 10px; cursor: pointer; }
-  .category-select:focus { outline: none; border-color: var(--bean); }
-  .bean-says { display: flex; gap: 14px; align-items: flex-start; border: 1.5px solid; border-radius: 16px; padding: 16px 18px; }
+  /* The email column: the latest message first, everything earlier folded into one row under it. */
+  .mail-col { display: flex; flex-direction: column; gap: 12px; }
+  .mail-card { background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .mail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .email-avatar { width: 40px; height: 40px; border-radius: 10px; background: #ECE6FA; color: #6B4FD8; display: grid; place-items: center; flex: none; font-family: var(--mono); font-weight: 700; font-size: 13px; }
+  .mail-who { flex: 1; min-width: 0; }
+  /* A long sender name wrapped to two lines and the absolute-width time sat on top of it. The name
+     truncates instead: the address below it and the thread bylines already carry identity, and a
+     collision reads as broken in a way a clipped name does not. */
+  .email-from { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mail-addr { display: flex; flex-wrap: wrap; column-gap: 8px; font-size: 13px; color: var(--ink-faint); }
+  .mail-addr-text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .email-time { margin-left: auto; align-self: flex-start; flex: none; font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mail-repeat { margin: -4px 0 10px; font-size: 13px; font-weight: 600; color: #B5462E; }
+  .mail-body .email-body p { color: var(--ink); max-width: 68ch; margin-bottom: 10px; }
+  .mail-body .email-body p:last-child { margin-bottom: 0; }
+  .mail-more { display: none; border: 0; background: none; padding: 8px 0 0; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--bean); cursor: pointer; }
+  .mail-earlier { background: var(--cream-2); border: 1.5px solid var(--line-soft); border-radius: 12px; }
+  .mail-earlier-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 16px; border: 0; border-radius: 12px; background: none; text-align: left; font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
+  .mail-earlier-head:hover { color: var(--ink); }
+  .mail-earlier-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 14px; border-top: 1.5px solid var(--line-soft); }
+
+  /* The draft column. */
+  .bean-panel { display: flex; flex-direction: column; gap: 12px; }
+  .draft-box { background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(58,48,32,.07); transition: border-color .15s, box-shadow .15s; }
+  .draft-box.is-editing { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(211,154,44,.16), 0 8px 24px rgba(58,48,32,.07); }
+  .draft-box-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 8px 14px 0 20px; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+  .draft-box-tools { display: flex; gap: 2px; }
+  .draft-tool { border: 0; background: none; padding: 5px 7px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bean); white-space: nowrap; cursor: pointer; }
+  .draft-tool:hover { background: var(--cream-2); }
+  /* What she is about to send, set the way mail is set. The screen font is still free to differ
+     from the email's: both copy paths AUTHOR the clipboard rather than inheriting the rendered css
+     — CopyButton / copyDraft build their own html, and `draftCopyHandler` (bean-draft.jsx)
+     intercepts a hand-selected Cmd+C — so what lands in the composer is COPY_STYLE (sans-serif
+     14pt) whatever this rule says. A typewriter font once rode into every reply that way; if that
+     handler is ever removed, this rule has to match COPY_STYLE instead. */
+  .draft-text { padding: 8px 20px 20px; font-family: var(--sans); font-size: 15.5px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .draft-edit { display: block; width: 100%; min-height: 180px; margin: 0; padding: 8px 20px 20px; border: 0; background: none; outline: none; resize: none; overflow: hidden; font-family: var(--sans); font-size: 15.5px; line-height: 1.6; color: var(--ink); }
+
+  .draft-view .why-block { background: var(--paper); border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .draft-view .why-label { margin: 0 0 6px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+  .draft-view .why-block.is-low { background: #FBF1DA; border-color: #EAD6A2; }
+  .draft-view .why-block.is-low .why-label { color: #9A6A12; }
+  .draft-view .why-block.is-flag { background: #FBE7E0; border-color: #F1C3B4; }
+  .draft-view .why-block.is-flag .why-label { color: #B5462E; }
+  /* Green's reason IS its grounding, so its "why" is the sources line itself, led by a label. */
+  .draft-view .why-block.is-high { background: none; border: 0; padding: 0; }
+  .draft-view .why-block.is-high .why-label { margin: 0; color: #2E7D3E; }
+  .why-list { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .why-list li { margin: 3px 0; }
+  .why-block.is-high .why-list { margin-top: 8px; }
+  .sources-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0; border: 0; background: none; text-align: left; font-family: var(--sans); font-size: 13px; color: var(--ink-soft); cursor: pointer; border-radius: 6px; }
+  .sources-text { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .sources-head:hover .sources-text { text-decoration-color: var(--ink-faint); }
+  .cite-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .cite-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 260px; padding: 3px 10px; border-radius: 999px; border: 1.5px solid; font-family: var(--sans); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .cite-chip.is-inert { cursor: default; }
+
+  .bean-says { display: flex; gap: 14px; align-items: flex-start; border: 1.5px solid; border-radius: 12px; padding: 16px 18px; }
+  .bean-says.is-filed { background: #F4EFE6; border-color: #E4DCCB; }
   .bean-says-title { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+  .bean-says.is-filed .bean-says-title { color: #8A7F6C; }
   .bean-says-body { font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
 
-  .why-block, .concern-block, .flag-reason { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; padding: 15px 17px; }
+  .why-block { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; padding: 15px 17px; }
   .why-block.subtle { background: var(--cream-2); }
   .why-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); margin-bottom: 10px; }
-  .reason-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-  .reason-list li { display: flex; gap: 9px; font-size: 13.5px; line-height: 1.45; color: #4a4338; }
-  .reason-mark { font-weight: 900; flex: none; }
-  .reason-high .reason-mark { color: #2E7D3E; }
-  .reason-low .reason-mark { color: #E0A92E; }
-  .reason-neutral .reason-mark { color: var(--ink-faint); }
-  .concern-block { background: #FCF6E8; border-color: #EAD6A2; }
-  .flag-reason { background: #FCEDE7; border-color: #F1C3B4; }
-  .flag-reason p { margin: 0; font-size: 14px; line-height: 1.55; color: #6a4034; }
-  .template-chip { display: inline-flex; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--bean); background: #F1E7D6; border: 1px solid #E2D0B6; padding: 4px 11px; border-radius: 8px; letter-spacing: .3px; }
-
-  .draft-box { background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; }
-  .draft-box-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; background: var(--cream-2); border-bottom: 1.5px solid var(--line); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); }
-  .draft-edit-btn { background: none; border: none; color: var(--bean); font-weight: 800; font-size: 12.5px; cursor: pointer; }
-  /* The ONE place Bean drops its own typeface. Everything else on this page is Courier Prime
-     because that is Bean's face — but this box is not Bean talking, it is the email the operator is
-     about to send, and it has to look like their mail rather than like ours. It is also the fix for
-     a real daily tax: selecting this text and hitting Cmd+C copies the RENDERED css, so a
-     typewriter font rode into Proton's composer on every reply and had to be reformatted by hand.
-     Kept in sync with COPY_STYLE in bean-ui.jsx, which puts the same font on the Copy button's
-     html clipboard flavor — the two copy paths must not disagree. */
-  /* This block wears Bean's own typeface again, and that is now a free choice rather than a risk.
-     It used to be forced to sans-serif because a hand-selected Cmd+C copies the RENDERED css, so the
-     page's Courier rode into the composer on every reply and got reformatted by hand. Both copy
-     paths now AUTHOR the clipboard instead of inheriting it — CopyButton builds its own html, and
-     `draftCopyHandler` (bean-draft.jsx) intercepts manual copies — so what lands in the email is
-     sans-serif 14pt regardless of what the screen shows. Display and clipboard are decoupled; if you
-     ever remove that handler, this rule has to go back to sans-serif with it.
-     Still framed as a preview pane: a white sheet inset in the cream card, a hairline, a soft
-     shadow — so it reads as the email sitting inside Bean rather than as loose text. */
-  .draft-text { margin: 14px; padding: 18px 20px; background: #FFFFFF; border: 1px solid var(--line-soft); border-radius: 10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 1px 3px rgba(58,48,32,.06); font-size: 15px; line-height: 1.7; color: #3a342c; white-space: pre-wrap; overflow-wrap: anywhere; }
 
   .bean-note { font-size: 13px; line-height: 1.5; color: #6a5a30; background: #FBF1DA; border: 1.5px dashed #E0A92E; border-radius: 12px; padding: 12px 15px; }
   .bean-note b { color: #7a5410; }
 
-  .no-draft { display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); background: repeating-linear-gradient(135deg, #f6f1e6, #f6f1e6 9px, #f1ebde 9px, #f1ebde 18px); border: 1.5px dashed var(--line); border-radius: 14px; padding: 16px 18px; }
+  .no-draft { display: flex; align-items: center; gap: 12px; font-size: 13.5px; font-weight: 600; color: var(--ink-soft); background: repeating-linear-gradient(135deg, #f6f1e6, #f6f1e6 9px, #f1ebde 9px, #f1ebde 18px); border: 1.5px dashed var(--line); border-radius: 12px; padding: 16px 18px; }
+  .no-draft .draft-tool { margin-left: auto; flex: none; background: var(--paper); border: 1.5px solid var(--line); }
 
-  .edit-pane { display: flex; flex-direction: column; gap: 14px; }
-  .edit-area { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 16px; font-family: inherit; font-size: 13.5px; line-height: 1.65; color: var(--ink); background: var(--paper); resize: vertical; }
-  .edit-area:focus { outline: none; border-color: var(--bean); box-shadow: 0 0 0 3px #e7d9c2; }
-
-  .action-bar { display: flex; gap: 10px; flex-wrap: wrap; }
   .bean-btn:hover:not([disabled]) { transform: translateY(-1px); }
   .bean-btn:active:not([disabled]) { transform: translateY(1px); box-shadow: none !important; }
 
@@ -818,30 +872,24 @@
   }
 
   /* ---------- Thread history + Shopify links (draft view) ---------- */
-  .shopify-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-  .shopify-link {
-    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700;
-    color: #4257d6; background: #eef0fd; border: 1px solid #d7dcfa;
-    padding: 4px 10px; border-radius: 8px; text-decoration: none; white-space: nowrap;
-  }
-  .shopify-link:hover { background: #e2e6fb; border-color: #c2c9f5; }
-  .thread-history { background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 12px; padding: 13px 15px; margin-bottom: 14px; }
-  .thread-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-faint); margin-bottom: 10px; }
+  /* Quiet links in the sender line, after the address: "addr · Customer ↗ · #1234 ↗". */
+  .shopify-link { font-size: 12.5px; font-weight: 500; color: #3D5BD9; text-decoration: none; white-space: nowrap; }
+  .shopify-link::before { content: '·'; color: var(--ink-faint); margin-right: 8px; }
+  .shopify-link:hover { text-decoration: underline; }
+  .thread-history { display: flex; flex-direction: column; }
   .thread-msg { border-left: 3px solid var(--line); padding: 0 0 0 11px; margin-bottom: 10px; }
   .thread-msg p { margin: 0 0 5px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
   .thread-msg p:last-child { margin-bottom: 0; }
   .thread-msg-head { display: flex; align-items: baseline; gap: 7px; width: 100%; background: none; border: 0; padding: 0 0 4px; margin: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; min-width: 0; }
   .thread-msg.is-collapsed .thread-msg-head { padding-bottom: 0; }
-  .thread-caret { font-size: 9px; color: var(--ink-faint); flex: none; }
+  /* The triangles come from the system face: IBM Plex Sans has no ▸, and its fallback rendered it as a speck. */
+  .thread-caret, .sources-caret { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: var(--ink-faint); flex: none; }
   /* Byline and peek both truncate rather than wrap or overflow: `min-width:0` is what lets a flex
      child shrink below its content width, without which the ellipsis never fires and the text is
      sliced off mid-character at the card edge. The byline shrinks last — it is the useful half. */
   .thread-who { font-size: 11.5px; font-weight: 700; color: var(--ink-faint); white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .thread-peek { font-size: 12px; color: var(--ink-faint); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
   .thread-body { max-height: 260px; overflow-y: auto; }
-  .thread-more { display: block; background: none; border: 0; padding: 0 0 9px; margin: 0; cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--bean); letter-spacing: .2px; }
-  .thread-more:hover { text-decoration: underline; }
-  .thread-current { font-size: 11px; font-weight: 800; color: var(--bean); letter-spacing: .4px; }
   .thread-pill { font-size: 10.5px; font-weight: 800; color: var(--bean); background: #f1e7d6; border: 1px solid #e2d0b6; padding: 1px 7px; border-radius: 999px; white-space: nowrap; letter-spacing: .2px; }
   /* Warmer than the thread pill and deliberately louder: an unanswered chase is the one thing in a
      row that is about the CUSTOMER's patience rather than about Bean's confidence. */
@@ -865,7 +913,7 @@
   /* Members read as inset under the row that answers them, not as peers of it. */
   .convo-card-rows .inbox-row { margin-left: 18px; opacity: .85; }
 
-  .convo-strip { background: #fbe9df; border: 1.5px solid #f0cdb9; border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+  .convo-strip { background: #fbe9df; border: 1.5px solid #f0cdb9; border-radius: 12px; padding: 12px 14px; }
   .convo-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #9a4b2e; margin-bottom: 9px; }
   .convo-msg { border-left: 3px solid #f0cdb9; padding-left: 11px; margin-bottom: 10px; }
   .convo-msg:last-child { margin-bottom: 0; }
@@ -950,11 +998,13 @@
   .url-preview a { color: #4257d6; }
   .atom-group { margin-bottom: 18px; }
   .atom-group-head { font-size: 12px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 8px 3px; }
-  .feedback-bar { margin-top: 16px; padding-top: 14px; border-top: 1.5px dashed var(--line-soft); display: flex; flex-direction: column; gap: 9px; }
-  .feedback-like { align-self: flex-start; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 999px; font-family: inherit; font-weight: 800; font-size: 12.5px; color: var(--ink-soft); padding: 6px 14px; cursor: pointer; transition: all .15s; }
+  .feedback-bar { display: flex; flex-direction: column; gap: 6px; }
+  .feedback-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 28px; }
+  .feedback-head label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+  .feedback-like { flex: none; background: var(--cream-2); border: 1.5px solid var(--line); border-radius: 999px; font-family: inherit; font-weight: 600; font-size: 12.5px; color: var(--ink-soft); padding: 3px 12px; cursor: pointer; transition: all .15s; }
   .feedback-like:hover { border-color: var(--bean); color: var(--ink); }
   .feedback-like.is-on { background: #EAF6EC; border-color: #BFE3C6; color: #2E7D3E; }
-  .feedback-comment { width: 100%; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 12px; font-family: inherit; font-size: 13px; line-height: 1.5; color: var(--ink); background: var(--cream-2); resize: vertical; }
+  .feedback-comment { width: 100%; min-height: 46px; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--sans); font-size: 14px; line-height: 1.5; color: var(--ink); background: var(--paper); resize: vertical; }
   .feedback-comment:focus { outline: none; border-color: var(--bean); background: var(--paper); box-shadow: 0 0 0 3px #e7d9c2; }
   .gap-teach-btn { margin-top: 12px; width: 100%; background: var(--cream-2); border: 1.5px dashed var(--line); border-radius: 11px; font-family: inherit; font-weight: 800; font-size: 13px; color: var(--ink-soft); padding: 11px 14px; cursor: pointer; transition: all .15s; }
   .gap-teach-btn:hover { border-color: var(--bean); color: var(--bean); }
@@ -1098,10 +1148,46 @@
   @media (min-width: 720px) { .es-scrim { align-items: center; padding: 24px; } .es-sheet { border-radius: 18px; } }
 
   /* ---------- Responsive ---------- */
+  /* Laptop-narrow: the draft view keeps only the essential actions in the bar; Snooze moves into ⋯. */
+  @media (max-width: 1100px) {
+    .dv-opt { display: none; }
+    .dv-menu-narrow { display: block; }
+    .draft-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 18px; }
+  }
   @media (max-width: 760px) {
     .app-shell { padding: 0 14px 80px; }
-    .draft-grid { grid-template-columns: 1fr; }
-    .email-panel { position: static; }
+    /* Phone: one column, the draft before the email, and the actions docked at the bottom edge so
+       the send is always under a thumb. The bar drops its backdrop blur here on purpose: a filter
+       makes an element the containing block of its `position: fixed` children, which would pin the
+       dock to the bar instead of to the screen. */
+    .app-shell.is-draft { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+    /* The nav wraps to four rows at phone width — a fifth of the screen above the email she opened.
+       "← Inbox" is the way out of this view, so the topbar steps aside here. */
+    .app-shell.is-draft .topbar { display: none; }
+    .dv-bar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--cream); margin-bottom: 12px; }
+    .dv-bar-in { flex-wrap: wrap; gap: 4px 10px; padding: 6px 0 10px; }
+    .dv-title { order: 3; flex-basis: 100%; }
+    .dv-title h2 { white-space: normal; font-size: 16px; }
+    .dv-bar .conf-badge { margin-left: auto; }
+    .dv-acts {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; gap: 8px;
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+      background: rgba(244,238,225,.97); border-top: 1.5px solid var(--line);
+    }
+    .dv-acts > .dv-btn { flex: 1; padding: 12px 8px; font-size: 14px; }
+    .dv-acts > .dv-btn.is-primary { flex: 2; }
+    .dv-acts .dv-more-btn { padding: 12px 8px; font-size: 14px; }
+    .dv-menu { top: auto; bottom: calc(100% + 8px); }
+    .app-shell.is-draft .bean-toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+    body:has(.app-shell.is-draft) .bean-chat-root { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+    .draft-grid { grid-template-columns: 1fr; gap: 12px; }
+    .bean-panel { order: -1; }
+    .mail-card { padding: 14px 16px; }
+    .mail-body { font-size: 15px; }
+    .mail-body.is-clamped { max-height: 6.4em; overflow: hidden; }
+    .mail-body.is-clamped + .mail-more { display: inline-block; }
+    .draft-box-head { padding-left: 16px; }
+    .draft-text, .draft-edit { padding: 6px 16px 16px; font-size: 15px; }
     .greet-card { grid-template-columns: 1fr; text-align: left; }
     .greet-bean { justify-self: start; }
     .greet-text p { max-width: none; }
@@ -1113,7 +1199,6 @@
   }
   @media (max-width: 420px) {
     .group-blurb { display: none; }
-    .action-bar .bean-btn { flex: 1 1 100% !important; }
   }
 </style>
 </head>

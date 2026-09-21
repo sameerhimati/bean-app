@@ -665,7 +665,7 @@ function App() {
 
   function approve(extra) {
     record(current, (extra && extra.edited) ? 'edit' : 'approve', extra);
-    advance(current.id, 'approved', 'Sent. On to the next one.', 'cheer');
+    advance(current.id, 'approved', 'Copied & marked sent. On to the next one.', 'cheer');
   }
   // Take it over → Bean steps aside. The takeover is logged only once the undo window closes, so an
   // accidental tap that's undone leaves NO trace in the learning log (the moat stays clean).
@@ -877,7 +877,7 @@ function App() {
     // list the Inbox renders from, so by the time this is non-empty the rows are in that commit.
     !tourDone && view.name === 'inbox' && (window.EMAILS || []).length > 0 &&
       React.createElement(window.BeanTour, { onDone: () => setTourDone(true) }),
-    React.createElement('div', { className: 'app-shell' + (view.name === 'admin' ? ' is-wide' : '') },
+    React.createElement('div', { className: 'app-shell' + (view.name === 'admin' ? ' is-wide' : '') + (view.name === 'draft' && current ? ' is-draft' : '') },
       React.createElement(window.TopBar, { onOpenInbox: back, onOpenAdmin: openAdmin, onOpenStats: openStats, onOpenNotebook: openNotebook, onTryEmail: tryEmail, onReopenOnboarding: reopenOnboarding, onOpenTeach: openQuestionnaire, teachLeft, connected, whatsNew }),
       React.createElement('main', { className: 'app-main' }, main),
       React.createElement(window.Toast, {

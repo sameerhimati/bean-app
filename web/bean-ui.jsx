@@ -1,4 +1,4 @@
-// Shared Bean UI: confidence config, badges, meter, buttons, toast.
+// Shared Bean UI: confidence config, badges, buttons, clipboard, toast.
 
 const CONF = {
   high: {
@@ -60,31 +60,6 @@ function CategoryTag({ children }) {
   // is the honest rendering of absence.
   if (children === null || children === undefined || children === '') return null;
   return React.createElement('span', { className: 'cat-tag' }, children);
-}
-
-// Stepped confidence meter (pixel-ish blocks)
-function ConfidenceMeter({ level }) {
-  const filled = level === 'high' ? 5 : level === 'low' ? 3 : 1;
-  const c = CONF[level];
-  const blocks = [];
-  for (let i = 0; i < 5; i++) {
-    blocks.push(React.createElement('div', {
-      key: i,
-      style: {
-        flex: 1, height: 12,
-        background: i < filled ? c.dot : '#E6DECF',
-        borderRadius: 2,
-        transition: 'background .3s',
-      },
-    }));
-  }
-  return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-    React.createElement('div', { style: { display: 'flex', gap: 4 } }, blocks),
-    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 11.5, fontWeight: 700, color: c.color } },
-      React.createElement('span', null, c.short),
-      React.createElement('span', { style: { color: '#9A8F7E', fontWeight: 600 } }, filled + '/5')
-    )
-  );
 }
 
 function Btn({ kind = 'primary', children, onClick, full = false, disabled = false, style = {} }) {
@@ -170,9 +145,12 @@ function fallbackCopy(text) {
     ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.focus(); ta.select();
-    document.execCommand('copy');
+    // execCommand REPORTS a refusal by returning false — it does not throw. Outside a user gesture
+    // (this path runs after an async clipboard write was already refused) that is the usual case, and
+    // returning `true` regardless let "Copy & mark sent" grade a reply that never reached the clipboard.
+    const ok = document.execCommand('copy');
     document.body.removeChild(ta);
-    return true;
+    return ok;
   } catch (e) { return false; }
 }
 
@@ -219,47 +197,58 @@ function draftAsHtml(text) {
 // THE core PoC action: Bean never sends — the operator copies the draft and sends it from their own inbox.
 // TWO flavors on the clipboard, not one: a rich target (Proton's composer, Gmail) takes the html
 // and pastes ready to send, a plain target takes byte-identical text. Degrades through
-// navigator.clipboard to the execCommand fallback; flips to "Copied ✓" for ~1.5s (setTimeout,
-// no Date.now).
-function CopyButton({ text, kind = 'primary', full = false, label = 'Copy draft', style = {} }) {
+// navigator.clipboard to the execCommand fallback. Resolves true only when a copy actually landed,
+// so no caller claims "copied" — or grades the draft as sent — on a clipboard that refused it.
+//
+// Shared by CopyButton (copy only) and the draft view's "Copy & mark sent" (copy AND grade). Both
+// must put down exactly the same two flavors: which button she pressed is Bean's business, and it
+// must never show up in what the customer receives.
+function copyDraft(text) {
+  // The two flavors need DIFFERENT sources, which is easy to get wrong: the html one must see the
+  // RAW text so it still has `**` spans to promote to <strong>, while the plain one gets them
+  // removed, because a plain-text target cannot render bold and would otherwise show the customer
+  // the syntax. Stripping once up front (the obvious version) silently disables the promotion and
+  // leaves the html flavor unemphasised.
+  const raw = text || '';
+  const t = stripMarkdown(raw);
+  const plainCopy = () => new Promise(resolve => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(() => resolve(true), () => resolve(fallbackCopy(t)));
+    } else { resolve(fallbackCopy(t)); }
+  });
+  // ClipboardItem is the only way to put two flavors down at once. Where it is missing or the
+  // write is refused, fall through to the plain-text path — the exact behaviour Bean shipped
+  // before, so a browser without it loses the font and nothing else.
+  if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+    try {
+      const item = new ClipboardItem({
+        'text/html': new Blob([draftAsHtml(raw)], { type: 'text/html' }),
+        'text/plain': new Blob([t], { type: 'text/plain' }),
+      });
+      return navigator.clipboard.write([item]).then(() => true, plainCopy);
+    } catch (e) { /* Blob/ClipboardItem construction refused — plain text still works */ }
+  }
+  return plainCopy();
+}
+
+// Copy WITHOUT grading; flips to "Copied ✓" for ~1.5s (setTimeout, no Date.now). `className`
+// swaps the heavy Btn for a plain classed button — the draft box's quiet copy link must not read as
+// a second primary action beside "Copy & mark sent".
+function CopyButton({ text, kind = 'primary', full = false, label = 'Copy draft', style = {}, className = '' }) {
   const [copied, setCopied] = React.useState(false);
   const timer = React.useRef(null);
   React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  function flash() {
-    setCopied(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setCopied(false), 1500);
-  }
-  function plainCopy(t) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(t).then(flash, () => { if (fallbackCopy(t)) flash(); });
-    } else if (fallbackCopy(t)) { flash(); }
-  }
   function doCopy() {
-    // The two flavors need DIFFERENT sources, which is easy to get wrong: the html one must see the
-    // RAW text so it still has `**` spans to promote to <strong>, while the plain one gets them
-    // removed, because a plain-text target cannot render bold and would otherwise show the customer
-    // the syntax. Stripping once up front (the obvious version) silently disables the promotion and
-    // leaves the html flavor unemphasised.
-    const raw = text || '';
-    const t = stripMarkdown(raw);
-    // ClipboardItem is the only way to put two flavors down at once. Where it is missing or the
-    // write is refused, fall through to the plain-text path — the exact behaviour Bean shipped
-    // before, so a browser without it loses the font and nothing else.
-    if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
-      try {
-        const item = new ClipboardItem({
-          'text/html': new Blob([draftAsHtml(raw)], { type: 'text/html' }),
-          'text/plain': new Blob([t], { type: 'text/plain' }),
-        });
-        navigator.clipboard.write([item]).then(flash, () => plainCopy(t));
-        return;
-      } catch (e) { /* Blob/ClipboardItem construction refused — plain text still works */ }
-    }
-    plainCopy(t);
+    copyDraft(text).then(ok => {
+      if (!ok) return;
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    });
   }
-  return React.createElement(Btn, { kind, full, onClick: doCopy, style },
-    copied ? 'Copied ✓' : ('⧉ ' + label));
+  const face = copied ? 'Copied ✓' : ('⧉ ' + label);
+  if (className) return React.createElement('button', { type: 'button', className, onClick: doCopy }, face);
+  return React.createElement(Btn, { kind, full, onClick: doCopy, style }, face);
 }
 
 // ---- when mail arrived ----------------------------------------------------------------------
@@ -299,4 +288,4 @@ function beanTimeLabel(raw, now) {
   return sameDay ? time : d.toLocaleDateString('en-US', _DATE_FMT) + ', ' + time;
 }
 
-Object.assign(window, { CONF, ConfidenceBadge, CategoryTag, ConfidenceMeter, Btn, Toast, friendlyKind, CopyButton, operatorName, stripMarkdown, draftAsHtml, MD_BOLD_RE: _MD_BOLD, BEAN_TZ, beanTimeMs, beanTimeLabel });
+Object.assign(window, { CONF, ConfidenceBadge, CategoryTag, Btn, Toast, friendlyKind, CopyButton, copyDraft, operatorName, stripMarkdown, draftAsHtml, MD_BOLD_RE: _MD_BOLD, BEAN_TZ, beanTimeMs, beanTimeLabel });

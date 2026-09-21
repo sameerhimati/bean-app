@@ -97,12 +97,15 @@ for (const [name, extra] of Object.entries(STATES)) {
     onBack: () => {}, onCite: () => {},
   }), root);
 
+  // The gesture lives in the ⋯ menu (rare actions stay out of the send's way), so open it first —
+  // exactly as she has to.
+  const more = root.querySelector('button[aria-label="More actions"]');
+  if (more) more.click();
   const btn = buttonWith(BUTTON_LABEL);
   const present = !!btn;
-  // Type into the FeedbackBar exactly as she did, then file. The comment textarea is the LAST one
-  // on the card (the edit pane is closed, so it's the only one on green/yellow).
-  const areas = [...root.querySelectorAll('textarea')];
-  if (areas.length) setValue(areas[areas.length - 1], NOTE);
+  // Type into the "Tell Bean why" note exactly as she did, then file.
+  const note = root.querySelector('#bean-note');
+  if (note) setValue(note, NOTE);
   if (btn) buttonWith(BUTTON_LABEL).click();
   out[name] = { present, calls: seen };
 }

@@ -101,8 +101,8 @@ ReactDOM.render(React.createElement(window.DraftView, {
 const preview = root.querySelector('.draft-text');
 
 // --- what a MANUAL Cmd+C out of the box puts on the clipboard --------------------------------
-// The display wears Bean's Courier again, so this handler is the only thing keeping a hand copy
-// from carrying a typewriter font into the composer. Fire a real copy event at the rendered node.
+// This handler is what keeps a hand copy from carrying the screen's css into the composer — the
+// clipboard is authored, not inherited. Fire a real copy event at the rendered node.
 const manual = {};
 const ev = new window.Event('copy', { bubbles: true, cancelable: true });
 ev.clipboardData = { setData: (mime, v) => { manual[mime] = v; } };
@@ -157,9 +157,9 @@ def test_strip_leaves_ordinary_text_alone(out):
 
 
 # ---- the manual Cmd+C path --------------------------------------------------------------------
-# The draft box wears Bean's own Courier on screen. That is only safe because a hand-selected copy
-# is intercepted and re-authored; without the handler, the rendered typeface goes into the composer
-# and every reply needs reformatting by hand — which is a real tax that was already paid once.
+# A hand-selected copy is intercepted and re-authored, so what reaches the composer never depends on
+# the screen's css. Without the handler, the rendered typeface goes into the composer and every reply
+# needs reformatting by hand — a real tax that was already paid once, when the box wore Courier.
 
 def test_a_manual_copy_carries_the_email_font_not_the_screen_font(out):
     assert "-apple-system" in out["manualHtml"], out["manualHtml"][:200]
@@ -173,16 +173,22 @@ def test_a_manual_copy_carries_no_markdown_either(out):
     assert "15106534576" in out["manualPlain"]
 
 
-def test_the_preview_itself_is_beans_typeface():
-    """The payoff of the handler: display and clipboard are decoupled, so the box can look like Bean.
+def test_the_preview_reads_as_what_gets_sent():
+    """The draft is set the way mail is set: a sans-serif, never Bean's Courier.
+
+    The box is a preview of the operator's email, so it reads in the prose face (IBM Plex Sans via
+    `--sans`) rather than in Bean's typewriter. Display and clipboard are still decoupled — the copy
+    paths author the clipboard (COPY_STYLE) whatever the screen shows — but a preview in a face no
+    email is ever sent in is a preview that misdescribes what it previews.
 
     Asserted against the stylesheet rather than a computed style — the jsdom harness above loads the
     .jsx files but not Bean.html's CSS, so `getComputedStyle` there reports nothing and would pass
-    on any rule at all. `.draft-text` must NOT pin a sans-serif family: it inherits Bean's Courier,
-    and what reaches the composer is authored by the copy paths instead.
+    on any rule at all.
     """
     css = (_WEB / "Bean.html").read_text(encoding="utf-8")
     rule = next(l for l in css.splitlines() if l.strip().startswith(".draft-text {"))
-    assert "font-family" not in rule, f"draft-text pins a font again: {rule.strip()}"
+    assert "font-family: var(--sans)" in rule, f"draft-text is not set in the prose face: {rule.strip()}"
+    sans = next(l for l in css.splitlines() if l.strip().startswith("--sans:"))
+    assert "IBM Plex Sans" in sans and "sans-serif" in sans and "Courier" not in sans, sans.strip()
     # ...and the clipboard side must still be carrying the email font, or decoupling them was a loss.
     assert "-apple-system" in (_WEB / "bean-ui.jsx").read_text(encoding="utf-8")
